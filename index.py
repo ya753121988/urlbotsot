@@ -18,7 +18,7 @@ urls_col = db['urls']
 settings_col = db['settings']
 channels_col = db['channels']
 
-# --- থিম কালার ম্যাপ (Tailwind CSS) ---
+# --- থিম কালার ম্যাপ ---
 COLOR_MAP = {
     "red": {"text": "text-red-500", "bg": "bg-red-600", "border": "border-red-500", "hover": "hover:bg-red-700", "light_bg": "bg-red-50"},
     "orange": {"text": "text-orange-500", "bg": "bg-orange-600", "border": "border-orange-500", "hover": "hover:bg-orange-700", "light_bg": "bg-orange-50"},
@@ -54,7 +54,6 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
-# --- চ্যানেল বক্স জেনারেটর (সব পেজে প্রদর্শনের জন্য) ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
@@ -76,7 +75,7 @@ def get_channels_html(theme_color="sky"):
         </a>'''
     return html + '</div></div>'
 
-# --- ১. প্রফেশনাল এপিআই ---
+# --- API সিস্টেম ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
@@ -105,7 +104,7 @@ def api_system():
     shortened_url = request.host_url + short_code
     return shortened_url if res_format == 'text' else jsonify({"status": "success", "shortenedUrl": shortened_url})
 
-# --- ২. হোম পেজ ---
+# --- হোম পেজ ---
 @app.route('/')
 def index():
     settings = get_settings()
@@ -133,7 +132,7 @@ def index():
     </body></html>
     ''')
 
-# --- ৩. রেজাল্ট পেজ ---
+# --- রেজাল্ট পেজ ---
 @app.route('/shorten', methods=['POST'])
 def web_shorten():
     settings = get_settings()
@@ -159,7 +158,7 @@ def web_shorten():
     </body></html>
     ''')
 
-# --- ৪. এডমিন ড্যাশবোর্ড ---
+# --- এডমিন ড্যাশবোর্ড ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -210,13 +209,16 @@ def admin_panel():
                             <input type="number" name="steps" value="{settings['steps']}" class="w-full bg-gray-50 p-5 rounded-2xl border" placeholder="Ad Steps">
                             <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full bg-gray-50 p-5 rounded-2xl border" placeholder="Timer (Sec)">
                         </div>
-                        <label class="text-xs font-bold text-blue-600">Direct Ad Link (বাটনে ক্লিক করলে যে অ্যাড লিঙ্ক খুলবে)</label>
+                        <label class="text-xs font-bold text-blue-600">Direct Ad Link</label>
                         <input type="url" name="direct_link" value="{settings['direct_link']}" class="w-full bg-blue-50 p-5 rounded-2xl border font-bold" placeholder="https://ad-link.com">
-                        <label class="text-xs font-bold text-blue-600">Click Limit (বাটনে কতবার ক্লিক করতে হবে)</label>
+                        <label class="text-xs font-bold text-blue-600">Click Limit</label>
                         <input type="number" name="direct_click_limit" value="{settings['direct_click_limit']}" class="w-full bg-blue-50 p-5 rounded-2xl border font-bold">
+                        
+                        <!-- পরিবর্তনকৃত অংশ: API Key এডিট করা যাবে এখন -->
+                        <label class="text-xs font-bold text-gray-400">Manage API Key</label>
+                        <input type="text" name="api_key" value="{settings['api_key']}" class="w-full bg-gray-100 p-4 rounded-2xl text-xs font-mono border border-blue-100">
+                        
                         <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full bg-red-50 p-5 rounded-2xl border">
-                        <label class="text-xs font-bold text-gray-400">Your API Key</label>
-                        <input type="text" value="{settings['api_key']}" readonly class="w-full bg-gray-100 p-4 rounded-2xl text-xs font-mono">
                     </div>
 
                     <!-- Ads -->
@@ -286,7 +288,7 @@ def delete_channel(id):
     channels_col.delete_one({"_id": ObjectId(id)})
     return redirect(url_for('admin_panel'))
 
-# --- ৫. রিডাইরেক্ট লজিক (স্টেপ পেজ) ---
+# --- রিডাইরেক্ট লজিক ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -326,7 +328,6 @@ def handle_ad_steps(short_code):
     </body></html>
     ''')
 
-# --- লগইন ও আপডেট ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -344,6 +345,8 @@ def logout():
 @app.post('/admin/update')
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
+    
+    # পরিবর্তনকৃত অংশ: api_key ফর্ম থেকে নিয়ে আপডেট করা হচ্ছে
     d = {
         "site_name": request.form.get('site_name'),
         "steps": int(request.form.get('steps', 2)),
@@ -355,8 +358,10 @@ def update_settings():
         "direct_link": request.form.get('direct_link'),
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
-        "step_theme": request.form.get('step_theme')
+        "step_theme": request.form.get('step_theme'),
+        "api_key": request.form.get('api_key') # নতুন API Key সেভ হবে
     }
+    
     new_pass = request.form.get('new_password')
     if new_pass and len(new_pass) > 2: d["admin_password"] = generate_password_hash(new_pass)
     settings_col.update_one({}, {"$set": d})
