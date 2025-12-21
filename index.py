@@ -1,10 +1,11 @@
 import os
 import random
 import string
+import requests  # টেলিগ্রাম API কলের জন্য ইমপোর্ট করা হয়েছে
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify, session
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta # timedelta যুক্ত করা হয়েছে ওটিপি মেয়াদের জন্য
 from bson.objectid import ObjectId
 
 app = Flask(__name__)
@@ -17,6 +18,11 @@ db = client['premium_url_bot']
 urls_col = db['urls']
 settings_col = db['settings']
 channels_col = db['channels']
+otp_col = db['otps'] # OTP স্টোর করার জন্য কালেকশন
+
+# --- টেলিগ্রাম সেটিংস ---
+# আপনার টেলিগ্রাম বট টোকেনটি এখানে দিন অথবা এনভায়রনমেন্ট ভেরিয়েবলে সেট করুন
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN_HERE")
 
 # --- থিম কালার ম্যাপ ---
 COLOR_MAP = {
@@ -34,6 +40,7 @@ def get_settings():
     if not settings:
         default_settings = {
             "site_name": "Premium URL Shortener",
+            "admin_telegram_id": "", # রিকভারি চ্যাট আইডি
             "steps": 2,
             "timer_seconds": 10,
             "admin_password": generate_password_hash("admin123"),
@@ -205,6 +212,11 @@ def admin_panel():
                             <select name="step_theme" class="w-full bg-gray-50 p-4 rounded-2xl border">{"".join([f'<option value="{o}" {"selected" if settings.get("step_theme")==o else ""}>{o.capitalize()}</option>' for o in theme_options])}</select></div>
                         </div>
                         <input type="text" name="site_name" value="{settings['site_name']}" class="w-full bg-gray-50 p-5 rounded-2xl border font-bold" placeholder="Website Name">
+                        
+                        <!-- নতুন: টেলিগ্রাম আইডি ইনপুট -->
+                        <label class="text-xs font-bold text-blue-600">Telegram Chat ID (রিকভারির জন্য)</label>
+                        <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id', '')}" class="w-full bg-blue-50 p-5 rounded-2xl border font-bold" placeholder="Example: 12345678">
+
                         <div class="grid grid-cols-2 gap-4">
                             <input type="number" name="steps" value="{settings['steps']}" class="w-full bg-gray-50 p-5 rounded-2xl border" placeholder="Ad Steps">
                             <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full bg-gray-50 p-5 rounded-2xl border" placeholder="Timer (Sec)">
@@ -214,7 +226,6 @@ def admin_panel():
                         <label class="text-xs font-bold text-blue-600">Click Limit</label>
                         <input type="number" name="direct_click_limit" value="{settings['direct_click_limit']}" class="w-full bg-blue-50 p-5 rounded-2xl border font-bold">
                         
-                        <!-- পরিবর্তনকৃত অংশ: API Key এডিট করা যাবে এখন -->
                         <label class="text-xs font-bold text-gray-400">Manage API Key</label>
                         <input type="text" name="api_key" value="{settings['api_key']}" class="w-full bg-gray-100 p-4 rounded-2xl text-xs font-mono border border-blue-100">
                         
@@ -335,7 +346,15 @@ def login():
             session['logged_in'] = True
             return redirect(url_for('admin_panel'))
         return "Wrong Password!"
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh;"><form method="POST" style="background:white; padding:60px; border-radius:40px; box-shadow:0 20px 80px rgba(0,0,0,0.4);"><h2 style="font-family:sans-serif; font-weight:900; margin-bottom:30px; text-align:center; letter-spacing:-1px;">ADMIN ACCESS</h2><input type="password" name="password" placeholder="Key" style="padding:18px; border-radius:20px; border:1px solid #eee; width:280px; display:block; margin-bottom:15px; background:#f9f9f9; outline:none; font-weight:bold; text-align:center;"><button style="width:100%; padding:18px; background:#1e293b; color:white; border:none; border-radius:20px; font-weight:900; cursor:pointer; text-transform:uppercase; letter-spacing:2px;">Unlock</button></form></body>')
+    return render_template_string('''
+    <body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh;">
+        <form method="POST" style="background:white; padding:60px; border-radius:40px; box-shadow:0 20px 80px rgba(0,0,0,0.4); text-align:center;">
+            <h2 style="font-family:sans-serif; font-weight:900; margin-bottom:30px; letter-spacing:-1px;">ADMIN ACCESS</h2>
+            <input type="password" name="password" placeholder="Key" style="padding:18px; border-radius:20px; border:1px solid #eee; width:280px; display:block; margin-bottom:15px; background:#f9f9f9; outline:none; font-weight:bold; text-align:center;">
+            <button style="width:100%; padding:18px; background:#1e293b; color:white; border:none; border-radius:20px; font-weight:900; cursor:pointer; text-transform:uppercase; letter-spacing:2px;">Unlock</button>
+            <a href="/forgot-password" style="display:block; margin-top:20px; font-family:sans-serif; font-size:12px; color:gray; text-decoration:none;">Forgot Password?</a>
+        </form>
+    </body>''')
 
 @app.route('/logout')
 def logout():
@@ -346,9 +365,9 @@ def logout():
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
     
-    # পরিবর্তনকৃত অংশ: api_key ফর্ম থেকে নিয়ে আপডেট করা হচ্ছে
     d = {
         "site_name": request.form.get('site_name'),
+        "admin_telegram_id": request.form.get('admin_telegram_id'), # আপডেট
         "steps": int(request.form.get('steps', 2)),
         "timer_seconds": int(request.form.get('timer_seconds', 10)),
         "popunder": request.form.get('popunder'),
@@ -359,13 +378,55 @@ def update_settings():
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme'),
-        "api_key": request.form.get('api_key') # নতুন API Key সেভ হবে
+        "api_key": request.form.get('api_key')
     }
     
     new_pass = request.form.get('new_password')
     if new_pass and len(new_pass) > 2: d["admin_password"] = generate_password_hash(new_pass)
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
+
+# --- রিকভারি লজিক ---
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        tg_id = request.form.get('telegram_id')
+        settings = get_settings()
+        if tg_id and tg_id == settings.get('admin_telegram_id'):
+            otp = str(random.randint(100000, 999999))
+            otp_col.update_one({"id": "admin_reset"}, {"$set": {"otp": otp, "expire_at": datetime.now() + timedelta(minutes=5)}}, upsert=True)
+            token = TELEGRAM_BOT_TOKEN
+            msg = f"🛡️ Admin Reset OTP: {otp}"
+            try:
+                requests.post(f"https://api.telegram.org/bot{token}/sendMessage", data={"chat_id": tg_id, "text": msg})
+                session['reset_id'] = tg_id
+                return redirect(url_for('verify_otp'))
+            except Exception as e:
+                return f"Bot Token Error or Network Issue: {str(e)}"
+        return "Invalid ID!"
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center;">Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center;"><button style="width:100%; padding:15px; background:#3b82f6; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Send OTP</button><a href="/login" style="display:block; text-align:center; margin-top:15px; font-size:12px; color:#3b82f6; text-decoration:none;">Back to Login</a></form></body>')
+
+@app.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    if not session.get('reset_id'): return redirect('/forgot-password')
+    if request.method == 'POST':
+        otp = request.form.get('otp')
+        data = otp_col.find_one({"id": "admin_reset"})
+        if data and data['otp'] == otp and data['expire_at'] > datetime.now():
+            session['otp_verified'] = True
+            return redirect(url_for('reset_password'))
+        return "Wrong OTP or Expired!"
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center;">Verify</h2><input type="text" name="otp" placeholder="Enter OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:20px; font-weight:bold; letter-spacing:5px;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Verify</button></form></body>')
+
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if not session.get('otp_verified'): return redirect('/forgot-password')
+    if request.method == 'POST':
+        pw = request.form.get('password')
+        settings_col.update_one({}, {"$set": {"admin_password": generate_password_hash(pw)}})
+        session.clear()
+        return 'Password Updated Successfully! <a href="/login">Login Now</a>'
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center;">New Password</h2><input type="password" name="password" placeholder="Enter New Password" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; outline:none;"><button style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Update Password</button></form></body>')
 
 if __name__ == '__main__':
     app.run()
