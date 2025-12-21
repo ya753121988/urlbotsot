@@ -21,8 +21,8 @@ channels_col = db['channels']
 otp_col = db['otps'] # OTP স্টোর করার জন্য কালেকশন
 
 # --- টেলিগ্রাম সেটিংস ---
-# আপনার টেলিগ্রাম বট টোকেনটি এখানে দিন অথবা এনভায়রনমেন্ট ভেরিয়েবলে সেট করুন
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34")
+# আপনার টেলিগ্রাম বট টোকেনটি এখানে সেট করা হলো
+TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
 
 # --- থিম কালার ম্যাপ ---
 COLOR_MAP = {
@@ -61,23 +61,24 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
+# --- চ্যানেল বক্স জেনারেটর (লোগো বড় এবং টেক্সট বোল্ড করা হয়েছে) ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
     c = COLOR_MAP.get(theme_color, COLOR_MAP['sky'])
     
     html = f'''
-    <div class="w-full max-w-4xl mx-auto mt-10 mb-6 p-6 rounded-[35px] border border-white/10 glass shadow-2xl">
-        <h3 class="text-center {c['text']} font-black mb-6 uppercase tracking-[0.2em] text-xs">Premium Partner Channels</h3>
-        <div class="flex flex-wrap justify-center gap-6">
+    <div class="w-full max-w-5xl mx-auto mt-12 mb-8 p-8 rounded-[40px] border-2 border-white/10 glass shadow-2xl">
+        <h3 class="text-center {c['text']} font-black mb-10 uppercase tracking-[0.3em] text-lg">Premium Partner Channels</h3>
+        <div class="flex flex-wrap justify-center gap-12">
     '''
     for ch in channels:
         html += f'''
-        <a href="{ch['link']}" target="_blank" class="flex items-center gap-3 p-3 px-5 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition duration-300 group">
-            <img src="{ch['logo']}" class="w-12 h-12 rounded-full object-cover border-2 border-white/10 group-hover:border-white/30 transition">
-            <div class="text-left">
-                <p class="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">Join Our</p>
-                <p class="text-sm font-black text-gray-100 italic">CHANNEL</p>
+        <a href="{ch['link']}" target="_blank" class="flex flex-col items-center gap-4 group transition-transform hover:scale-110">
+            <img src="{ch['logo']}" class="w-28 h-28 md:w-36 md:h-36 rounded-full object-cover border-4 border-white/10 group-hover:border-white/40 shadow-2xl transition">
+            <div class="text-center">
+                <p class="text-[12px] text-gray-400 font-black uppercase tracking-tighter">Join Our</p>
+                <p class="text-lg font-black text-gray-100 italic uppercase">CHANNEL</p>
             </div>
         </a>'''
     return html + '</div></div>'
@@ -111,7 +112,7 @@ def api_system():
     shortened_url = request.host_url + short_code
     return shortened_url if res_format == 'text' else jsonify({"status": "success", "shortenedUrl": shortened_url})
 
-# --- হোম পেজ ---
+# --- হোম পেজ (লেখা বোল্ড ও অনেক বড় করা হয়েছে) ---
 @app.route('/')
 def index():
     settings = get_settings()
@@ -123,23 +124,23 @@ def index():
     <head>
         <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script src="https://cdn.tailwindcss.com"></script>
-        <title>{settings['site_name']} - Premium URL Shortener</title>
+        <title>{settings['site_name']}</title>
         <style>body {{ background: #0f172a; color: white; }} .glass {{ background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }}</style>
     </head>
-    <body class="min-h-screen flex flex-col items-center justify-center p-6">
-        <h1 class="text-6xl md:text-8xl font-black mb-4 {c['text']} italic tracking-tighter">{settings['site_name']}</h1>
-        <p class="text-gray-400 mb-12 text-lg font-medium">Fast, Secure and Highly Rewarding URL Shortener.</p>
-        <div class="glass p-3 rounded-[40px] w-full max-w-3xl shadow-2xl">
-            <form action="/shorten" method="POST" class="flex flex-col md:flex-row gap-2">
-                <input type="url" name="long_url" placeholder="Paste your long link here..." required class="flex-1 bg-transparent p-6 outline-none text-white text-lg">
-                <button type="submit" class="{c['bg']} text-white px-12 py-6 rounded-[30px] font-black text-xl hover:scale-105 transition uppercase tracking-widest shadow-xl">Shorten</button>
+    <body class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <h1 class="text-7xl md:text-9xl font-black mb-6 {c['text']} italic tracking-tighter uppercase">{settings['site_name']}</h1>
+        <p class="text-gray-200 mb-14 text-2xl md:text-4xl font-black uppercase tracking-widest">Fast • Secure • Premium</p>
+        <div class="glass p-5 rounded-[50px] w-full max-w-4xl shadow-3xl">
+            <form action="/shorten" method="POST" class="flex flex-col md:flex-row gap-4">
+                <input type="url" name="long_url" placeholder="PASTE YOUR LONG LINK HERE..." required class="flex-1 bg-transparent p-6 outline-none text-white text-2xl font-black placeholder:text-gray-500">
+                <button type="submit" class="{c['bg']} text-white px-14 py-6 rounded-[40px] font-black text-3xl hover:scale-105 transition uppercase tracking-tighter shadow-2xl">Shorten</button>
             </form>
         </div>
         {channel_box}
     </body></html>
     ''')
 
-# --- রেজাল্ট পেজ ---
+# --- রেজাল্ট পেজ (লেখা বোল্ড ও বড় করা হয়েছে) ---
 @app.route('/shorten', methods=['POST'])
 def web_shorten():
     settings = get_settings()
@@ -151,14 +152,14 @@ def web_shorten():
     channel_box = get_channels_html(settings.get('main_theme', 'sky'))
     return render_template_string(f'''
     <html><head><script src="https://cdn.tailwindcss.com"></script>
-    <style>body {{ background: #0f172a; color: white; }} .glass {{ background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }}</style>
+    <style>body {{ background: #0f172a; color: white; }}</style>
     </head>
     <body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white">
-        <div class="bg-slate-800 p-12 rounded-[50px] shadow-2xl text-center max-w-lg w-full border border-slate-700">
-            <h2 class="text-3xl font-black mb-8 {c['text']}">Link Created!</h2>
-            <input id="shortUrl" value="{final_url}" readonly class="w-full bg-slate-900 p-6 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-8 text-xl">
-            <button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-6 rounded-3xl font-black text-2xl uppercase transition">COPY LINK</button>
-            <a href="/" class="block mt-8 text-slate-500 font-bold uppercase text-xs hover:text-white transition">Shorten Another</a>
+        <div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700">
+            <h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2>
+            <input id="shortUrl" value="{final_url}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl">
+            <button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button>
+            <a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a>
         </div>
         {channel_box}
         <script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script>
@@ -202,7 +203,6 @@ def admin_panel():
                 <h1 class="text-4xl font-black mb-12 tracking-tight">System Controls</h1>
                 
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 xl:grid-cols-2 gap-10">
-                    <!-- Config -->
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-6">
                         <h3 class="font-black text-xl border-b pb-4">⚙️ General & Appearance</h3>
                         <div class="grid grid-cols-2 gap-4">
@@ -213,7 +213,6 @@ def admin_panel():
                         </div>
                         <input type="text" name="site_name" value="{settings['site_name']}" class="w-full bg-gray-50 p-5 rounded-2xl border font-bold" placeholder="Website Name">
                         
-                        <!-- নতুন: টেলিগ্রাম আইডি ইনপুট -->
                         <label class="text-xs font-bold text-blue-600">Telegram Chat ID (রিকভারির জন্য)</label>
                         <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id', '')}" class="w-full bg-blue-50 p-5 rounded-2xl border font-bold" placeholder="Example: 12345678">
 
@@ -232,7 +231,6 @@ def admin_panel():
                         <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full bg-red-50 p-5 rounded-2xl border">
                     </div>
 
-                    <!-- Ads -->
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-5">
                         <h3 class="font-black text-xl border-b pb-4 text-emerald-600">💰 Script Management</h3>
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full bg-gray-50 p-4 h-24 rounded-2xl text-xs font-mono border">{settings['popunder']}</textarea>
@@ -267,14 +265,13 @@ def admin_panel():
                 <div class="bg-white rounded-[40px] border shadow-sm overflow-hidden">
                     <table class="w-full text-left">
                         <thead class="bg-gray-50 text-[11px] font-black uppercase tracking-widest text-gray-400">
-                            <tr><th class="p-8">Created</th><th class="p-8">Short Code</th><th class="p-8">Destination URL</th><th class="p-8 text-center">Clicks</th></tr>
+                            <tr><th class="p-8">Created</th><th class="p-8">Short Code</th><th class="p-8 text-center">Clicks</th></tr>
                         </thead>
                         <tbody class="divide-y text-sm font-semibold">
                             {" ".join([f'''
                             <tr class="hover:bg-slate-50 transition">
                                 <td class="p-8 text-gray-400 font-medium text-xs">{u.get('created_at','N/A')}</td>
                                 <td class="p-8 text-blue-600 font-bold">/{u['short_code']}</td>
-                                <td class="p-8 text-gray-500 truncate max-w-[200px]">{u['long_url']}</td>
                                 <td class="p-8 text-center"><span class="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full font-black">{u['clicks']}</span></td>
                             </tr>''' for u in all_urls])}
                         </tbody>
@@ -299,7 +296,7 @@ def delete_channel(id):
     channels_col.delete_one({"_id": ObjectId(id)})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক ---
+# --- রিডাইরেক্ট লজিক (স্টেপ পেজ - টেক্সট বড় ও চ্যানেল সবার নিচে) ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -317,16 +314,25 @@ def handle_ad_steps(short_code):
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script>
     {settings['popunder']} {settings['social_bar']}
     </head>
-    <body class="bg-slate-50 flex flex-col items-center justify-center min-h-screen p-4">
-        <div class="mb-4">{settings['banner']}</div>
-        <div class="bg-white p-12 md:p-20 rounded-[70px] shadow-2xl text-center max-w-md w-full border-t-[12px] {tc['border']}">
-            <p class="text-[11px] font-black {tc['text']} uppercase tracking-[0.3em] mb-4">Step {step}/{settings['steps']}</p>
-            <h2 class="text-3xl font-black text-slate-900 mb-10 tracking-tighter italic">Ready to Proceed?</h2>
-            <div id="timer" class="text-7xl font-black {tc['text']} mb-12 {tc['light_bg']} w-32 h-32 flex items-center justify-center rounded-full mx-auto border-4 {tc['border']} italic shadow-inner">{settings['timer_seconds']}</div>
-            <button id="btn" onclick="handleClick()" class="hidden w-full {tc['bg']} text-white py-7 rounded-[35px] font-black text-2xl uppercase shadow-2xl hover:scale-105 transition tracking-widest">Continue</button>
+    <body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
+        <div class="mb-6">{settings['banner']}</div>
+        
+        <div class="bg-white p-12 md:p-24 rounded-[80px] shadow-3xl text-center max-w-2xl w-full border-t-[16px] {tc['border']} my-8">
+            <p class="text-xl md:text-2xl font-black {tc['text']} uppercase tracking-[0.4em] mb-6">Step {step} of {settings['steps']}</p>
+            <h2 class="text-4xl md:text-6xl font-black text-slate-900 mb-12 tracking-tighter italic">Ready to Proceed?</h2>
+            
+            <div id="timer" class="text-8xl md:text-9xl font-black {tc['text']} mb-12 {tc['light_bg']} w-44 h-44 md:w-56 md:h-56 flex items-center justify-center rounded-full mx-auto border-8 {tc['border']} italic shadow-inner">{settings['timer_seconds']}</div>
+            
+            <button id="btn" onclick="handleClick()" class="hidden w-full {tc['bg']} text-white py-10 rounded-[50px] font-black text-4xl uppercase shadow-2xl hover:scale-105 transition tracking-tighter">Continue</button>
         </div>
-        <div class="mt-10">{settings['native']}</div>
-        {channel_box}
+        
+        <div class="mt-4">{settings['native']}</div>
+
+        <!-- চ্যানেল বক্স এখন সবার নিচে সিরিয়ালে আসবে -->
+        <div class="w-full mt-10">
+            {channel_box}
+        </div>
+
         <script>
             let t = {settings['timer_seconds']};
             let clicks = 0; let limit = {settings['direct_click_limit']};
@@ -339,6 +345,7 @@ def handle_ad_steps(short_code):
     </body></html>
     ''')
 
+# --- লগইন ও আপডেট রুটস (অপরিবর্তিত) ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -352,7 +359,7 @@ def login():
             <h2 style="font-family:sans-serif; font-weight:900; margin-bottom:30px; letter-spacing:-1px;">ADMIN ACCESS</h2>
             <input type="password" name="password" placeholder="Key" style="padding:18px; border-radius:20px; border:1px solid #eee; width:280px; display:block; margin-bottom:15px; background:#f9f9f9; outline:none; font-weight:bold; text-align:center;">
             <button style="width:100%; padding:18px; background:#1e293b; color:white; border:none; border-radius:20px; font-weight:900; cursor:pointer; text-transform:uppercase; letter-spacing:2px;">Unlock</button>
-            <a href="/forgot-password" style="display:block; margin-top:20px; font-family:sans-serif; font-size:12px; color:gray; text-decoration:none;">Forgot Password?</a>
+            <a href="/forgot-password" style="display:block; margin-top:20px; font-family:sans-serif; font-size:12px; color:#3b82f6; text-decoration:none;">Forgot Password?</a>
         </form>
     </body>''')
 
@@ -364,10 +371,9 @@ def logout():
 @app.post('/admin/update')
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
-    
     d = {
         "site_name": request.form.get('site_name'),
-        "admin_telegram_id": request.form.get('admin_telegram_id'), # আপডেট
+        "admin_telegram_id": request.form.get('admin_telegram_id'),
         "steps": int(request.form.get('steps', 2)),
         "timer_seconds": int(request.form.get('timer_seconds', 10)),
         "popunder": request.form.get('popunder'),
@@ -380,7 +386,6 @@ def update_settings():
         "step_theme": request.form.get('step_theme'),
         "api_key": request.form.get('api_key')
     }
-    
     new_pass = request.form.get('new_password')
     if new_pass and len(new_pass) > 2: d["admin_password"] = generate_password_hash(new_pass)
     settings_col.update_one({}, {"$set": d})
@@ -404,7 +409,7 @@ def forgot_password():
             except Exception as e:
                 return f"Bot Token Error or Network Issue: {str(e)}"
         return "Invalid ID!"
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center;">Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center;"><button style="width:100%; padding:15px; background:#3b82f6; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Send OTP</button><a href="/login" style="display:block; text-align:center; margin-top:15px; font-size:12px; color:#3b82f6; text-decoration:none;">Back to Login</a></form></body>')
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center;"><button style="width:100%; padding:15px; background:#3b82f6; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Send OTP</button><a href="/login" style="display:block; text-align:center; margin-top:15px; font-size:12px; color:#3b82f6; text-decoration:none;">Back to Login</a></form></body>')
 
 @app.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
@@ -416,7 +421,7 @@ def verify_otp():
             session['otp_verified'] = True
             return redirect(url_for('reset_password'))
         return "Wrong OTP or Expired!"
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center;">Verify</h2><input type="text" name="otp" placeholder="Enter OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:20px; font-weight:bold; letter-spacing:5px;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Verify</button></form></body>')
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Verify</h2><input type="text" name="otp" placeholder="Enter OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:20px; font-weight:bold; letter-spacing:5px;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold; cursor:pointer;">Verify</button></form></body>')
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
