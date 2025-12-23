@@ -69,7 +69,7 @@ def get_channels_html(theme_color="sky"):
     for ch in channels:
         html += f'''<a href="{ch['link']}" target="_blank" class="flex flex-col items-center gap-3 group transition-transform hover:scale-105">
             <div class="text-center"><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider">{ch.get('name', 'Join Our Channel')}</p></div>
-            <img src="{ch['logo']}" style="width: 468px; height: 60px;" class="object-cover border-2 border-white/10 rounded-lg group-hover:border-white/40 shadow-2xl transition">
+            <img src="{ch['logo']}" style="width: 320px; height: 180px;" class="object-cover border-2 border-white/10 rounded-lg group-hover:border-white/40 shadow-2xl transition">
         </a>'''
     return html + '</div></div>'
 
