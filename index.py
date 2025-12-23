@@ -225,7 +225,7 @@ def admin_panel():
                 </form>
             </div>
 
-            <!-- TAB 3: PARTNERS (Updated with Name and 468x60 Banner) -->
+            <!-- TAB 3: PARTNERS (Updated with Name and 320x180 Banner) -->
             <div id="partners" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
                     <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
