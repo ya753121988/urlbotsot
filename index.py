@@ -23,7 +23,7 @@ otp_col = db['otps']
 # --- টেলিগ্রাম সেটিংস ---
 TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
 
-# --- থিম কালার ম্যাপ ---
+# --- থিম কালার ম্যাপ (Design Options) ---
 COLOR_MAP = {
     "red": {"text": "text-red-500", "bg": "bg-red-600", "border": "border-red-500", "hover": "hover:bg-red-700", "light_bg": "bg-red-50"},
     "orange": {"text": "text-orange-500", "bg": "bg-orange-600", "border": "border-orange-500", "hover": "hover:bg-orange-700", "light_bg": "bg-orange-50"},
@@ -31,7 +31,9 @@ COLOR_MAP = {
     "green": {"text": "text-green-500", "bg": "bg-green-600", "border": "border-green-500", "hover": "hover:bg-green-700", "light_bg": "bg-green-50"},
     "blue": {"text": "text-blue-500", "bg": "bg-blue-600", "border": "border-blue-500", "hover": "hover:bg-blue-700", "light_bg": "bg-blue-50"},
     "sky": {"text": "text-sky-400", "bg": "bg-sky-500", "border": "border-sky-400", "hover": "hover:bg-sky-600", "light_bg": "bg-sky-50"},
-    "purple": {"text": "text-purple-500", "bg": "bg-purple-600", "border": "border-purple-500", "hover": "hover:bg-purple-700", "light_bg": "bg-purple-50"}
+    "purple": {"text": "text-purple-500", "bg": "bg-purple-600", "border": "border-purple-500", "hover": "hover:bg-purple-700", "light_bg": "bg-purple-50"},
+    "pink": {"text": "text-pink-500", "bg": "bg-pink-600", "border": "border-pink-500", "hover": "hover:bg-pink-700", "light_bg": "bg-pink-50"},
+    "slate": {"text": "text-slate-400", "bg": "bg-slate-700", "border": "border-slate-500", "hover": "hover:bg-slate-800", "light_bg": "bg-slate-50"}
 }
 
 def get_settings():
@@ -61,26 +63,30 @@ def get_channels_html(theme_color="sky"):
     if not channels: return ""
     c = COLOR_MAP.get(theme_color, COLOR_MAP['sky'])
     html = f'''<div class="w-full max-w-5xl mx-auto mt-12 mb-8 p-8 rounded-[40px] border-2 border-white/10 glass shadow-2xl">
-        <h3 class="text-center {c['text']} font-black mb-10 uppercase tracking-[0.3em] text-lg">Premium Partner Channels</h3>
+        <h3 class="text-center {c['text']} font-black mb-10 uppercase tracking-[0.3em] text-lg">Partner Channels</h3>
         <div class="flex flex-wrap justify-center gap-12">'''
     for ch in channels:
         html += f'''<a href="{ch['link']}" target="_blank" class="flex flex-col items-center gap-4 group transition-transform hover:scale-110">
-            <img src="{ch['logo']}" class="w-28 h-28 md:w-36 md:h-36 rounded-full object-cover border-4 border-white/10 group-hover:border-white/40 shadow-2xl transition">
-            <div class="text-center"><p class="text-[12px] text-gray-400 font-black uppercase tracking-tighter">Join Our</p><p class="text-lg font-black text-gray-100 italic uppercase">CHANNEL</p></div></a>'''
+            <img src="{ch['logo']}" class="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-white/10 group-hover:border-white/40 shadow-2xl transition">
+            <div class="text-center"><p class="text-[10px] text-gray-400 font-black uppercase">Official</p><p class="text-sm font-black text-gray-100 italic uppercase">Channel</p></div></a>'''
     return html + '</div></div>'
 
-# --- API সিস্টেম ---
+# --- API সিস্টেম (Fix: Invalid Token Error) ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
+    # Support multiple parameters and cleaning spaces
     raw_token = request.args.get('api') or request.args.get('api_key') or request.args.get('key')
     api_token = raw_token.strip() if raw_token else None
+    
     long_url = request.args.get('url')
     alias = request.args.get('alias')
     res_format = request.args.get('format', 'json').lower()
     ad_type = request.args.get('type', '1')
 
-    if not api_token or api_token != settings['api_key'].strip():
+    stored_token = settings['api_key'].strip()
+
+    if not api_token or api_token != stored_token:
         return jsonify({"status": "error", "message": "Invalid API Token"}) if res_format != 'text' else "Error: Invalid Token"
     
     if not long_url:
@@ -108,7 +114,7 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "1"})
     return render_template_string(f'''<html><head><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড ---
+# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড (3-Menu Tab System) ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -116,7 +122,7 @@ def admin_panel():
     all_urls = list(urls_col.find().sort("_id", -1))
     total_clicks = sum(u.get('clicks', 0) for u in all_urls)
     channels = list(channels_col.find())
-    theme_options = ["red", "orange", "yellow", "green", "blue", "sky", "purple"]
+    theme_options = sorted(COLOR_MAP.keys())
 
     return render_template_string(f'''
     <html><head><script src="https://cdn.tailwindcss.com"></script>
@@ -124,33 +130,36 @@ def admin_panel():
     <style> body {{ font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }} .active-tab {{ background: #1e293b !important; color: white !important; }} .tab-content {{ display: none; }} .tab-content.active {{ display: block; }} </style>
     </head>
     <body class="flex flex-col lg:flex-row min-h-screen">
+        <!-- Sidebar Navigation -->
         <div class="lg:w-72 bg-white border-r p-8 flex flex-col shadow-sm">
-            <h2 class="text-2xl font-black text-slate-900 mb-12 italic tracking-tighter">PREMIUM <span class="text-blue-600">PRO</span></h2>
+            <h2 class="text-2xl font-black text-slate-900 mb-12 italic tracking-tighter">PREMIUM <span class="text-blue-600">ADMIN</span></h2>
             <nav class="space-y-3 flex-1">
-                <button onclick="showTab('overview')" id="tab-overview-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3 active-tab">📊 Overview</button>
-                <button onclick="showTab('config')" id="tab-config-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">⚙️ Configurations</button>
-                <button onclick="showTab('partners')" id="tab-partners-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">📢 Partners</button>
+                <button onclick="showTab('overview')" id="tab-overview-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3 active-tab">📊 Analytics</button>
+                <button onclick="showTab('config')" id="tab-config-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">⚙️ Design & Setup</button>
+                <button onclick="showTab('partners')" id="tab-partners-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">📢 Partnerships</button>
             </nav>
-            <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout</a>
+            <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout Account</a>
         </div>
 
+        <!-- Content Area -->
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
+            
+            <!-- TAB 1: OVERVIEW -->
             <div id="overview" class="tab-content active space-y-10">
-                <header><h1 class="text-4xl font-black text-slate-900">Analytics</h1></header>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
-                        <p class="text-slate-400 text-xs font-bold uppercase mb-1">Total Links</p>
+                        <p class="text-slate-400 text-xs font-bold uppercase mb-1">Total Generated Links</p>
                         <h3 class="text-5xl font-black text-slate-900">{len(all_urls)}</h3>
                     </div>
                     <div class="bg-blue-600 p-8 rounded-[40px] shadow-lg text-white">
-                        <p class="text-blue-200 text-xs font-bold uppercase mb-1">Total Clicks</p>
+                        <p class="text-blue-200 text-xs font-bold uppercase mb-1">Total Redirect Clicks</p>
                         <h3 class="text-5xl font-black">{total_clicks}</h3>
                     </div>
                 </div>
                 <div class="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
                     <table class="w-full text-left">
                         <thead class="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                            <tr><th class="p-6">Date</th><th class="p-6">Short Link</th><th class="p-6 text-center">Clicks</th></tr>
+                            <tr><th class="p-6">Time</th><th class="p-6">Short Link</th><th class="p-6 text-center">Clicks</th></tr>
                         </thead>
                         <tbody class="divide-y text-sm font-bold text-slate-700">
                             {" ".join([f'<tr class="hover:bg-slate-50 transition"><td class="p-6 text-xs text-slate-400">{u.get("created_at")}</td><td class="p-6 text-blue-600">/{u["short_code"]}</td><td class="p-6 text-center"><span class="bg-slate-100 px-4 py-1 rounded-full">{u["clicks"]}</span></td></tr>' for u in all_urls[:15]])}
@@ -159,54 +168,68 @@ def admin_panel():
                 </div>
             </div>
 
+            <!-- TAB 2: CONFIGURATIONS (Design System Included) -->
             <div id="config" class="tab-content space-y-8">
-                <header><h1 class="text-4xl font-black text-slate-900">Settings</h1></header>
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-6">
-                        <h4 class="font-black text-lg text-blue-600">Site Config</h4>
-                        <input type="text" name="site_name" value="{settings['site_name']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold">
+                        <h4 class="font-black text-xl text-slate-900">🎨 UI & Design System</h4>
                         <div class="grid grid-cols-2 gap-4">
-                            <select name="main_theme" class="w-full p-4 bg-slate-50 rounded-2xl border-none">{"".join([f'<option value="{o}" {"selected" if settings.get("main_theme")==o else ""}>{o.capitalize()}</option>' for o in theme_options])}</select>
-                            <select name="step_theme" class="w-full p-4 bg-slate-50 rounded-2xl border-none">{"".join([f'<option value="{o}" {"selected" if settings.get("step_theme")==o else ""}>{o.capitalize()}</option>' for o in theme_options])}</select>
+                            <div>
+                                <label class="text-xs font-bold text-slate-400 mb-2 block">HOME PAGE THEME</label>
+                                <select name="main_theme" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold text-slate-700">
+                                    {"".join([f'<option value="{o}" {"selected" if settings.get("main_theme")==o else ""}>{o.upper()}</option>' for o in theme_options])}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-xs font-bold text-slate-400 mb-2 block">STEP PAGE THEME</label>
+                                <select name="step_theme" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold text-slate-700">
+                                    {"".join([f'<option value="{o}" {"selected" if settings.get("step_theme")==o else ""}>{o.upper()}</option>' for o in theme_options])}
+                                </select>
+                            </div>
                         </div>
+                        <input type="text" name="site_name" value="{settings['site_name']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-black text-lg" placeholder="Website Title">
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="number" name="steps" value="{settings['steps']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Steps">
-                            <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Timer">
+                            <input type="number" name="steps" value="{settings['steps']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Ad Steps">
+                            <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Timer Seconds">
                         </div>
-                        <h4 class="font-black text-lg text-orange-500 pt-4">Security</h4>
+                        <h4 class="font-black text-xl text-slate-900 pt-4">🔑 API & Security</h4>
+                        <label class="text-xs font-bold text-orange-500">API TOKEN (Auto-cleaned)</label>
                         <input type="text" name="api_key" value="{settings['api_key']}" class="w-full p-4 bg-orange-50 rounded-2xl font-mono text-xs border border-orange-100">
-                        <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id','')}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Telegram ID">
-                        <input type="password" name="new_password" class="w-full p-4 bg-red-50 rounded-2xl border-none" placeholder="New Password">
+                        <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id','')}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Telegram Admin ID">
+                        <input type="password" name="new_password" class="w-full p-4 bg-red-50 rounded-2xl border-none" placeholder="Update Admin Password">
                     </div>
+
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-4">
-                        <h4 class="font-black text-lg text-emerald-600">Monetization</h4>
+                        <h4 class="font-black text-xl text-emerald-600">💰 Monetization (Scripts)</h4>
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="url" name="direct_link" value="{settings['direct_link']}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold" placeholder="Direct Link">
-                            <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold" placeholder="Limit">
+                            <input type="url" name="direct_link" value="{settings['direct_link']}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Direct Link">
+                            <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Limit">
                         </div>
-                        <textarea name="popunder" placeholder="Popunder" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['popunder']}</textarea>
-                        <textarea name="banner" placeholder="Banner" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['banner']}</textarea>
-                        <textarea name="social_bar" placeholder="Social Bar" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['social_bar']}</textarea>
-                        <textarea name="native" placeholder="Native" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['native']}</textarea>
-                        <button class="w-full bg-slate-900 text-white p-5 rounded-3xl font-black text-lg">Save All</button>
+                        <textarea name="popunder" placeholder="Popunder Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['popunder']}</textarea>
+                        <textarea name="banner" placeholder="Banner Ad Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['banner']}</textarea>
+                        <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['social_bar']}</textarea>
+                        <textarea name="native" placeholder="Native/Bottom Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['native']}</textarea>
+                        <button class="w-full bg-slate-900 text-white p-6 rounded-[30px] font-black text-xl shadow-2xl hover:scale-[1.02] transition mt-4">Save All Changes</button>
                     </div>
                 </form>
             </div>
 
+            <!-- TAB 3: PARTNERS -->
             <div id="partners" class="tab-content space-y-8">
-                <header><h1 class="text-4xl font-black text-slate-900">Partners</h1></header>
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
+                    <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
                     <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                        <input type="url" name="logo" placeholder="Logo URL" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
-                        <input type="url" name="link" placeholder="Link" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
-                        <button class="bg-blue-600 text-white p-4 rounded-2xl font-black uppercase shadow-lg">Add Partner</button>
+                        <input type="url" name="logo" placeholder="Channel Logo URL" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
+                        <input type="url" name="link" placeholder="Invite Link" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
+                        <button class="bg-blue-600 text-white p-4 rounded-2xl font-black uppercase shadow-lg hover:bg-blue-700 transition">Add Channel</button>
                     </form>
                     <div class="mt-12 flex flex-wrap gap-8">
-                        {" ".join([f'<div class="relative"><img src="{c["logo"]}" class="w-20 h-20 rounded-full border-4 border-slate-100 object-cover shadow-sm"><a href="/admin/delete_channel/{c["_id"]}" class="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-center text-xs leading-6 font-bold">×</a></div>' for c in channels])}
+                        {" ".join([f'<div class="relative group"><img src="{c["logo"]}" class="w-20 h-20 rounded-full border-4 border-slate-100 object-cover shadow-sm transition group-hover:border-blue-400"><a href="/admin/delete_channel/{c["_id"]}" class="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-center text-xs leading-6 font-bold shadow-md">×</a></div>' for c in channels])}
                     </div>
                 </div>
             </div>
         </div>
+
         <script>
             function showTab(tabId) {{
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -236,7 +259,7 @@ def delete_channel(id):
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
     raw_api_key = request.form.get('api_key', '')
-    cleaned_api_key = raw_api_key.strip()
+    cleaned_api_key = raw_api_key.strip() # Cleaning token spaces
     d = {
         "site_name": request.form.get('site_name'),
         "admin_telegram_id": request.form.get('admin_telegram_id'),
@@ -257,7 +280,7 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক (টাইমার ফিক্সড) ---
+# --- রিডাইরেক্ট লজিক (টাইমার ফিক্সড - লোডেই শুরু হবে) ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -275,15 +298,13 @@ def handle_ad_steps(short_code):
     </head>
     <body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
         <div class="mb-6">{settings['banner']}</div>
-        <div class="bg-white p-12 md:p-24 rounded-[80px] shadow-3xl text-center max-w-2xl w-full border-t-[16px] {tc['border']} my-8">
-            <p class="text-xl md:text-2xl font-black {tc['text']} uppercase tracking-[0.4em] mb-6">Step {step} of {settings['steps']}</p>
-            <h2 class="text-4xl md:text-6xl font-black text-slate-900 mb-12 tracking-tighter italic">Ready to Proceed?</h2>
+        <div class="bg-white p-12 md:p-20 rounded-[70px] shadow-3xl text-center max-w-2xl w-full border-t-[16px] {tc['border']} my-4">
+            <p class="text-xl md:text-2xl font-black {tc['text']} uppercase tracking-widest mb-4">Step {step} of {settings['steps']}</p>
+            <h2 class="text-3xl md:text-5xl font-black text-slate-900 mb-8 tracking-tighter italic">Verifying Status...</h2>
             
-            <!-- টাইমার পেজ লোড হওয়া মাত্রই শুরু হবে -->
-            <div id="timer_box" class="text-8xl md:text-9xl font-black {tc['text']} mb-12 {tc['light_bg']} w-44 h-44 md:w-56 md:h-56 flex items-center justify-center rounded-full mx-auto border-8 {tc['border']} italic shadow-inner">{settings['timer_seconds']}</div>
+            <div id="timer_box" class="text-7xl md:text-8xl font-black {tc['text']} mb-8 {tc['light_bg']} w-40 h-40 md:w-48 md:h-48 flex items-center justify-center rounded-full mx-auto border-8 {tc['border']} italic shadow-inner">{settings['timer_seconds']}</div>
             
-            <!-- বাটনটি টাইমার শেষ হওয়ার আগে দেখা যাবে না -->
-            <button id="main_btn" onclick="handleClick()" class="hidden w-full {tc['bg']} text-white py-10 rounded-[50px] font-black text-4xl uppercase shadow-2xl transition tracking-tighter">Continue</button>
+            <button id="main_btn" onclick="handleClick()" class="hidden w-full {tc['bg']} text-white py-8 rounded-[40px] font-black text-3xl uppercase shadow-2xl transition hover:scale-105">Continue</button>
         </div>
         <div class="mt-4">{settings['native']}</div>
         {get_channels_html(settings.get('step_theme', 'blue'))}
@@ -297,49 +318,46 @@ def handle_ad_steps(short_code):
             const timerBox = document.getElementById('timer_box');
             const mainBtn = document.getElementById('main_btn');
 
-            // টাইমার ফাংশন - পেজ লোড হওয়া মাত্র শুরু হবে
             const countdown = setInterval(() => {{
                 timeLeft--;
                 timerBox.innerText = timeLeft;
                 if(timeLeft <= 0) {{
                     clearInterval(countdown);
-                    timerBox.style.display = 'none'; // টাইমার বক্স লুকিয়ে ফেলা
-                    mainBtn.classList.remove('hidden'); // বাটন দেখানো
+                    timerBox.style.display = 'none';
+                    mainBtn.classList.remove('hidden');
                     refreshBtnText();
                 }}
             }}, 1000);
 
             function refreshBtnText() {{
                 if (totalAdClicks < adLimit && adUrl !== "") {{
-                    mainBtn.innerText = "CONTINUE (" + (totalAdClicks + 1) + "/" + adLimit + ")";
+                    mainBtn.innerText = "VERIFY (" + (totalAdClicks + 1) + "/" + adLimit + ")";
                 }} else {{
-                    mainBtn.innerText = "NEXT STEP";
+                    mainBtn.innerText = "CONTINUE TO NEXT";
                 }}
             }}
 
             function handleClick() {{
                 if (totalAdClicks < adLimit && adUrl !== "") {{
-                    window.open(adUrl, '_blank'); // অ্যাড ওপেন হবে
+                    window.open(adUrl, '_blank');
                     totalAdClicks++;
                     refreshBtnText();
-                    // অ্যাড দেখার পর কোনো টাইমার আবার শুরু হবে না
                 }} else {{
-                    // সব অ্যাড ক্লিক শেষ হলে পরবর্তী স্টেপে যাবে
                     window.location.href = "/{short_code}?step={step + 1}";
                 }}
             }}
         </script>
     </body></html>''')
 
-# --- লগইন ও রিকভারি ---
+# --- লগইন ও রিকভারি লজিক ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         if check_password_hash(get_settings()['admin_password'], request.form.get('password')):
             session['logged_in'] = True
             return redirect(url_for('admin_panel'))
-        return "Wrong Password!"
-    return render_template_string('''<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh;"><form method="POST" style="background:white; padding:60px; border-radius:40px; text-align:center;"><h2 style="font-family:sans-serif; font-weight:900; margin-bottom:30px;">ADMIN</h2><input type="password" name="password" placeholder="Key" style="padding:18px; border-radius:20px; border:1px solid #eee; width:280px; display:block; margin-bottom:15px; background:#f9f9f9; outline:none; text-align:center;"><button style="width:100%; padding:18px; background:#1e293b; color:white; border:none; border-radius:20px; font-weight:900; cursor:pointer;">Unlock</button><a href="/forgot-password" style="display:block; margin-top:20px; font-size:12px; color:#3b82f6; text-decoration:none;">Forgot?</a></form></body>''')
+        return "Access Denied!"
+    return render_template_string('''<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:50px; border-radius:40px; text-align:center; box-shadow:0 0 50px rgba(0,0,0,0.5);"><h2 style="font-weight:900; margin-bottom:30px; font-size:24px;">ADMIN PORTAL</h2><input type="password" name="password" placeholder="Key" style="padding:15px; border-radius:15px; border:1px solid #eee; width:250px; display:block; margin-bottom:15px; background:#f9f9f9; outline:none; text-align:center; font-weight:bold;"><button style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:15px; font-weight:900; cursor:pointer;">UNLOCK</button><a href="/forgot-password" style="display:block; margin-top:20px; font-size:12px; color:#3b82f6; text-decoration:none; font-weight:bold;">Forgot Passkey?</a></form></body>''')
 
 @app.route('/logout')
 def logout():
@@ -354,10 +372,10 @@ def forgot_password():
         if tg_id and tg_id == settings.get('admin_telegram_id'):
             otp = str(random.randint(100000, 999999))
             otp_col.update_one({"id": "admin_reset"}, {"$set": {"otp": otp, "expire_at": datetime.now() + timedelta(minutes=5)}}, upsert=True)
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ OTP: {otp}"})
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ YOUR SECURITY OTP: {otp}"})
             session['reset_id'] = tg_id
             return redirect(url_for('verify_otp'))
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram ID" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center;"><button style="width:100%; padding:15px; background:#3b82f6; color:white; border:none; border-radius:15px; font-weight:bold;">Send OTP</button></form></body>')
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center;"><button style="width:100%; padding:15px; background:#3b82f6; color:white; border:none; border-radius:15px; font-weight:bold;">GET OTP</button></form></body>')
 
 @app.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
@@ -368,7 +386,7 @@ def verify_otp():
         if data and data['otp'] == otp and data['expire_at'] > datetime.now():
             session['otp_verified'] = True
             return redirect(url_for('reset_password'))
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Verify</h2><input type="text" name="otp" placeholder="OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:20px; letter-spacing:5px;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold;">Verify</button></form></body>')
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Verify</h2><input type="text" name="otp" placeholder="ENTER OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:24px; font-weight:bold; letter-spacing:5px;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold;">VERIFY</button></form></body>')
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
@@ -377,8 +395,8 @@ def reset_password():
         pw = request.form.get('password')
         settings_col.update_one({}, {"$set": {"admin_password": generate_password_hash(pw)}})
         session.clear()
-        return 'Updated! <a href="/login">Login</a>'
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center;">New Pass</h2><input type="password" name="password" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0;"><button style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:15px; font-weight:bold;">Update</button></form></body>')
+        return 'SUCCESS! <a href="/login">LOGIN NOW</a>'
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center; font-weight:900;">NEW PASSKEY</h2><input type="password" name="password" required placeholder="New Password" style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0;"><button style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:15px; font-weight:bold;">UPDATE</button></form></body>')
 
 if __name__ == '__main__':
     app.run()
