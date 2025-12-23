@@ -58,7 +58,7 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
-# --- চ্যানেল বক্স জেনারেটর (468x60 ব্যানার স্টাইল) ---
+# --- চ্যানেল বক্স জেনারেটর (320x180 ব্যানার স্টাইল) ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
