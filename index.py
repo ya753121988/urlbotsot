@@ -71,14 +71,12 @@ def get_channels_html(theme_color="sky"):
             <div class="text-center"><p class="text-[10px] text-gray-400 font-black uppercase">Official</p><p class="text-sm font-black text-gray-100 italic uppercase">Channel</p></div></a>'''
     return html + '</div></div>'
 
-# --- API সিস্টেম (Fix: Invalid Token Error) ---
+# --- API সিস্টেম (Fix: Universal Support & Cleaning) ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
-    # Support multiple parameters and cleaning spaces
     raw_token = request.args.get('api') or request.args.get('api_key') or request.args.get('key')
     api_token = raw_token.strip() if raw_token else None
-    
     long_url = request.args.get('url')
     alias = request.args.get('alias')
     res_format = request.args.get('format', 'json').lower()
@@ -114,7 +112,7 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "1"})
     return render_template_string(f'''<html><head><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড (3-Menu Tab System) ---
+# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -130,7 +128,6 @@ def admin_panel():
     <style> body {{ font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }} .active-tab {{ background: #1e293b !important; color: white !important; }} .tab-content {{ display: none; }} .tab-content.active {{ display: block; }} </style>
     </head>
     <body class="flex flex-col lg:flex-row min-h-screen">
-        <!-- Sidebar Navigation -->
         <div class="lg:w-72 bg-white border-r p-8 flex flex-col shadow-sm">
             <h2 class="text-2xl font-black text-slate-900 mb-12 italic tracking-tighter">PREMIUM <span class="text-blue-600">ADMIN</span></h2>
             <nav class="space-y-3 flex-1">
@@ -141,10 +138,8 @@ def admin_panel():
             <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout Account</a>
         </div>
 
-        <!-- Content Area -->
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
             
-            <!-- TAB 1: OVERVIEW -->
             <div id="overview" class="tab-content active space-y-10">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
@@ -168,7 +163,6 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB 2: CONFIGURATIONS (Design System Included) -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-6">
@@ -188,13 +182,24 @@ def admin_panel():
                             </div>
                         </div>
                         <input type="text" name="site_name" value="{settings['site_name']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-black text-lg" placeholder="Website Title">
+                        
                         <div class="grid grid-cols-2 gap-4">
                             <input type="number" name="steps" value="{settings['steps']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Ad Steps">
                             <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Timer Seconds">
                         </div>
-                        <h4 class="font-black text-xl text-slate-900 pt-4">🔑 API & Security</h4>
-                        <label class="text-xs font-bold text-orange-500">API TOKEN (Auto-cleaned)</label>
-                        <input type="text" name="api_key" value="{settings['api_key']}" class="w-full p-4 bg-orange-50 rounded-2xl font-mono text-xs border border-orange-100">
+
+                        <!-- API Key Management System -->
+                        <h4 class="font-black text-xl text-slate-900 pt-4">🔑 API Management</h4>
+                        <div class="bg-orange-50 p-6 rounded-[30px] border border-orange-100 space-y-4">
+                            <label class="text-xs font-bold text-orange-600 block uppercase">API Shortener Token</label>
+                            <input type="text" id="api_key_field" name="api_key" value="{settings['api_key']}" class="w-full p-4 bg-white rounded-xl font-mono text-xs border border-orange-200 outline-none" placeholder="Your API Token">
+                            <div class="flex gap-2">
+                                <button type="button" onclick="copyAPI()" class="flex-1 bg-white border border-orange-200 text-orange-600 p-3 rounded-xl text-xs font-black hover:bg-orange-100 transition">COPY KEY</button>
+                                <button type="button" onclick="generateAPI()" class="flex-1 bg-orange-600 text-white p-3 rounded-xl text-xs font-black hover:bg-orange-700 shadow-md transition">REGENERATE</button>
+                            </div>
+                            <p class="text-[10px] text-orange-400 font-bold italic">* After regenerating or editing, you MUST click 'Save All Changes' below.</p>
+                        </div>
+
                         <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id','')}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Telegram Admin ID">
                         <input type="password" name="new_password" class="w-full p-4 bg-red-50 rounded-2xl border-none" placeholder="Update Admin Password">
                     </div>
@@ -214,7 +219,6 @@ def admin_panel():
                 </form>
             </div>
 
-            <!-- TAB 3: PARTNERS -->
             <div id="partners" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
                     <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
@@ -236,6 +240,22 @@ def admin_panel():
                 document.querySelectorAll('nav button').forEach(b => b.classList.remove('active-tab'));
                 document.getElementById(tabId).classList.add('active');
                 document.getElementById('tab-' + tabId + '-btn').classList.add('active-tab');
+            }}
+
+            function copyAPI() {{
+                const copyText = document.getElementById("api_key_field");
+                copyText.select();
+                navigator.clipboard.writeText(copyText.value);
+                alert("API Key Copied!");
+            }}
+
+            function generateAPI() {{
+                const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+                let newKey = "";
+                for (let i = 0; i < 40; i++) {{
+                    newKey += chars.charAt(Math.floor(Math.random() * chars.length));
+                }}
+                document.getElementById("api_key_field").value = newKey;
             }}
         </script>
     </body></html>
@@ -259,7 +279,7 @@ def delete_channel(id):
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
     raw_api_key = request.form.get('api_key', '')
-    cleaned_api_key = raw_api_key.strip() # Cleaning token spaces
+    cleaned_api_key = raw_api_key.strip()
     d = {
         "site_name": request.form.get('site_name'),
         "admin_telegram_id": request.form.get('admin_telegram_id'),
@@ -280,7 +300,7 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক (টাইমার ফিক্সড - লোডেই শুরু হবে) ---
+# --- রিডাইরেক্ট লজিক ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -349,7 +369,7 @@ def handle_ad_steps(short_code):
         </script>
     </body></html>''')
 
-# --- লগইন ও রিকভারি লজিক ---
+# --- লগইন ও রিকভারি ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
