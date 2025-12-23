@@ -240,7 +240,7 @@ def admin_panel():
                         <div class="flex flex-col md:flex-row items-center gap-6 bg-slate-50 p-6 rounded-[30px] border border-slate-100 relative">
                             <div class="flex-1">
                                 <p class="text-sm font-black text-slate-900 uppercase mb-2">{c.get('name', 'N/A')}</p>
-                                <img src="{c["logo"]}" style="width: 468px; height: 60px;" class="object-cover rounded-lg shadow-sm border border-slate-200">
+                                <img src="{c["logo"]}" style="width: 320px; height: 180px;" class="object-cover rounded-lg shadow-sm border border-slate-200">
                             </div>
                             <a href="/admin/delete_channel/{c["_id"]}" class="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md">Delete</a>
                         </div>''' for c in channels])}
