@@ -21,7 +21,6 @@ channels_col = db['channels']
 otp_col = db['otps'] # OTP স্টোর করার জন্য কালেকশন
 
 # --- টেলিগ্রাম সেটিংস ---
-# আপনার টেলিগ্রাম বট টোকেনটি এখানে সেট করা হলো
 TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
 
 # --- থিম কালার ম্যাপ ---
@@ -40,7 +39,7 @@ def get_settings():
     if not settings:
         default_settings = {
             "site_name": "Premium URL Shortener",
-            "admin_telegram_id": "", # রিকভারি চ্যাট আইডি
+            "admin_telegram_id": "", 
             "steps": 2,
             "timer_seconds": 10,
             "admin_password": generate_password_hash("admin123"),
@@ -61,7 +60,6 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
-# --- চ্যানেল বক্স জেনারেটর (লোগো বড় এবং টেক্সট বোল্ড করা হয়েছে) ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
@@ -83,18 +81,25 @@ def get_channels_html(theme_color="sky"):
         </a>'''
     return html + '</div></div>'
 
-# --- API সিস্টেম ---
+# --- সংশোধিত API সিস্টেম (Fixed Token Validation) ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
-    api_token = request.args.get('api')
+    # একাধিক প্যারামিটার সাপোর্ট এবং স্পেস ক্লিনিং
+    raw_token = request.args.get('api') or request.args.get('api_key') or request.args.get('key')
+    api_token = raw_token.strip() if raw_token else None
+    
     long_url = request.args.get('url')
     alias = request.args.get('alias')
     res_format = request.args.get('format', 'json').lower()
     ad_type = request.args.get('type', '1')
 
-    if not api_token or api_token != settings['api_key']:
+    # ডাটাবেসের টোকেন চেক (উভয় দিক থেকে স্পেস সরিয়ে)
+    stored_token = settings['api_key'].strip()
+
+    if not api_token or api_token != stored_token:
         return jsonify({"status": "error", "message": "Invalid API Token"}) if res_format != 'text' else "Error: Invalid Token"
+    
     if not long_url:
         return jsonify({"status": "error", "message": "Missing URL"}) if res_format != 'text' else "Error: Missing URL"
 
@@ -112,7 +117,7 @@ def api_system():
     shortened_url = request.host_url + short_code
     return shortened_url if res_format == 'text' else jsonify({"status": "success", "shortenedUrl": shortened_url})
 
-# --- হোম পেজ (লেখা বোল্ড ও অনেক বড় করা হয়েছে) ---
+# --- হোম পেজ ---
 @app.route('/')
 def index():
     settings = get_settings()
@@ -140,7 +145,7 @@ def index():
     </body></html>
     ''')
 
-# --- রেজাল্ট পেজ (লেখা বোল্ড ও বড় করা হয়েছে) ---
+# --- রেজাল্ট পেজ ---
 @app.route('/shorten', methods=['POST'])
 def web_shorten():
     settings = get_settings()
@@ -296,7 +301,7 @@ def delete_channel(id):
     channels_col.delete_one({"_id": ObjectId(id)})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক (স্টেপ পেজ - টেক্সট বড় ও চ্যানেল সবার নিচে) ---
+# --- রিডাইরেক্ট লজিক ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -328,7 +333,6 @@ def handle_ad_steps(short_code):
         
         <div class="mt-4">{settings['native']}</div>
 
-        <!-- চ্যানেল বক্স এখন সবার নিচে সিরিয়ালে আসবে -->
         <div class="w-full mt-10">
             {channel_box}
         </div>
@@ -345,7 +349,7 @@ def handle_ad_steps(short_code):
     </body></html>
     ''')
 
-# --- লগইন ও আপডেট রুটস (অপরিবর্তিত) ---
+# --- লগইন ও আপডেট ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -368,9 +372,15 @@ def logout():
     session.pop('logged_in', None)
     return redirect(url_for('login'))
 
+# --- সংশোধিত আপডেট সেটিংস (Fixed Token Stripping) ---
 @app.post('/admin/update')
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
+    
+    # API Key থেকে অতিরিক্ত স্পেস সরিয়ে নেওয়া হচ্ছে
+    raw_api_key = request.form.get('api_key', '')
+    cleaned_api_key = raw_api_key.strip()
+
     d = {
         "site_name": request.form.get('site_name'),
         "admin_telegram_id": request.form.get('admin_telegram_id'),
@@ -384,7 +394,7 @@ def update_settings():
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme'),
-        "api_key": request.form.get('api_key')
+        "api_key": cleaned_api_key if cleaned_api_key else get_settings()['api_key']
     }
     new_pass = request.form.get('new_password')
     if new_pass and len(new_pass) > 2: d["admin_password"] = generate_password_hash(new_pass)
