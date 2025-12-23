@@ -58,25 +58,28 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
+# --- চ্যানেল বক্স জেনারেটর (468x60 ব্যানার স্টাইল) ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
     c = COLOR_MAP.get(theme_color, COLOR_MAP['sky'])
     html = f'''<div class="w-full max-w-5xl mx-auto mt-12 mb-8 p-8 rounded-[40px] border-2 border-white/10 glass shadow-2xl">
         <h3 class="text-center {c['text']} font-black mb-10 uppercase tracking-[0.3em] text-lg">Partner Channels</h3>
-        <div class="flex flex-wrap justify-center gap-12">'''
+        <div class="flex flex-col items-center gap-10">'''
     for ch in channels:
-        html += f'''<a href="{ch['link']}" target="_blank" class="flex flex-col items-center gap-4 group transition-transform hover:scale-110">
-            <img src="{ch['logo']}" class="w-24 h-24 md:w-32 md:h-32 rounded-full object-cover border-4 border-white/10 group-hover:border-white/40 shadow-2xl transition">
-            <div class="text-center"><p class="text-[10px] text-gray-400 font-black uppercase">Official</p><p class="text-sm font-black text-gray-100 italic uppercase">Channel</p></div></a>'''
+        html += f'''<a href="{ch['link']}" target="_blank" class="flex flex-col items-center gap-3 group transition-transform hover:scale-105">
+            <div class="text-center"><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider">{ch.get('name', 'Join Our Channel')}</p></div>
+            <img src="{ch['logo']}" style="width: 468px; height: 60px;" class="object-cover border-2 border-white/10 rounded-lg group-hover:border-white/40 shadow-2xl transition">
+        </a>'''
     return html + '</div></div>'
 
-# --- API সিস্টেম (Fix: Universal Support & Cleaning) ---
+# --- API সিস্টেম ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
     raw_token = request.args.get('api') or request.args.get('api_key') or request.args.get('key')
     api_token = raw_token.strip() if raw_token else None
+    
     long_url = request.args.get('url')
     alias = request.args.get('alias')
     res_format = request.args.get('format', 'json').lower()
@@ -112,7 +115,7 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "1"})
     return render_template_string(f'''<html><head><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড ---
+# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড (Tab Design) ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -128,6 +131,7 @@ def admin_panel():
     <style> body {{ font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }} .active-tab {{ background: #1e293b !important; color: white !important; }} .tab-content {{ display: none; }} .tab-content.active {{ display: block; }} </style>
     </head>
     <body class="flex flex-col lg:flex-row min-h-screen">
+        <!-- Sidebar Navigation -->
         <div class="lg:w-72 bg-white border-r p-8 flex flex-col shadow-sm">
             <h2 class="text-2xl font-black text-slate-900 mb-12 italic tracking-tighter">PREMIUM <span class="text-blue-600">ADMIN</span></h2>
             <nav class="space-y-3 flex-1">
@@ -138,8 +142,10 @@ def admin_panel():
             <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout Account</a>
         </div>
 
+        <!-- Content Area -->
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
             
+            <!-- TAB 1: OVERVIEW -->
             <div id="overview" class="tab-content active space-y-10">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
@@ -163,6 +169,7 @@ def admin_panel():
                 </div>
             </div>
 
+            <!-- TAB 2: CONFIGURATIONS -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-6">
@@ -188,7 +195,7 @@ def admin_panel():
                             <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Timer Seconds">
                         </div>
 
-                        <!-- API Key Management System -->
+                        <!-- API Key Management -->
                         <h4 class="font-black text-xl text-slate-900 pt-4">🔑 API Management</h4>
                         <div class="bg-orange-50 p-6 rounded-[30px] border border-orange-100 space-y-4">
                             <label class="text-xs font-bold text-orange-600 block uppercase">API Shortener Token</label>
@@ -197,7 +204,6 @@ def admin_panel():
                                 <button type="button" onclick="copyAPI()" class="flex-1 bg-white border border-orange-200 text-orange-600 p-3 rounded-xl text-xs font-black hover:bg-orange-100 transition">COPY KEY</button>
                                 <button type="button" onclick="generateAPI()" class="flex-1 bg-orange-600 text-white p-3 rounded-xl text-xs font-black hover:bg-orange-700 shadow-md transition">REGENERATE</button>
                             </div>
-                            <p class="text-[10px] text-orange-400 font-bold italic">* After regenerating or editing, you MUST click 'Save All Changes' below.</p>
                         </div>
 
                         <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id','')}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Telegram Admin ID">
@@ -219,16 +225,25 @@ def admin_panel():
                 </form>
             </div>
 
+            <!-- TAB 3: PARTNERS (Updated with Name and 468x60 Banner) -->
             <div id="partners" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
                     <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
-                    <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-                        <input type="url" name="logo" placeholder="Channel Logo URL" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
+                    <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                        <input type="text" name="name" placeholder="Channel Name" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
+                        <input type="url" name="logo" placeholder="Banner URL (468x60)" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
                         <input type="url" name="link" placeholder="Invite Link" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
                         <button class="bg-blue-600 text-white p-4 rounded-2xl font-black uppercase shadow-lg hover:bg-blue-700 transition">Add Channel</button>
                     </form>
-                    <div class="mt-12 flex flex-wrap gap-8">
-                        {" ".join([f'<div class="relative group"><img src="{c["logo"]}" class="w-20 h-20 rounded-full border-4 border-slate-100 object-cover shadow-sm transition group-hover:border-blue-400"><a href="/admin/delete_channel/{c["_id"]}" class="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-center text-xs leading-6 font-bold shadow-md">×</a></div>' for c in channels])}
+                    <div class="mt-12 space-y-8">
+                        {" ".join([f'''
+                        <div class="flex flex-col md:flex-row items-center gap-6 bg-slate-50 p-6 rounded-[30px] border border-slate-100 relative">
+                            <div class="flex-1">
+                                <p class="text-sm font-black text-slate-900 uppercase mb-2">{c.get('name', 'N/A')}</p>
+                                <img src="{c["logo"]}" style="width: 468px; height: 60px;" class="object-cover rounded-lg shadow-sm border border-slate-200">
+                            </div>
+                            <a href="/admin/delete_channel/{c["_id"]}" class="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md">Delete</a>
+                        </div>''' for c in channels])}
                     </div>
                 </div>
             </div>
@@ -265,8 +280,8 @@ def admin_panel():
 @app.route('/admin/add_channel', methods=['POST'])
 def add_channel():
     if not is_logged_in(): return redirect(url_for('login'))
-    logo, link = request.form.get('logo'), request.form.get('link')
-    if logo and link: channels_col.insert_one({"logo": logo, "link": link})
+    name, logo, link = request.form.get('name'), request.form.get('logo'), request.form.get('link')
+    if logo and link: channels_col.insert_one({"name": name, "logo": logo, "link": link})
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/delete_channel/<id>')
