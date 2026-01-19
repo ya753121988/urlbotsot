@@ -10,22 +10,28 @@ from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 
 app = Flask(__name__)
+# এটি সেশন সিকিউরিটির জন্য ব্যবহৃত হয়
 app.secret_key = os.environ.get("SECRET_KEY", "premium-super-secret-key-2025")
 
 # --- ডাটাবেস কানেকশন ---
+# MongoDB এর সাথে কানেক্ট করার জন্য URI ব্যবহার করা হয়েছে
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://user:pass@cluster.mongodb.net/test")
 client = MongoClient(MONGO_URI, tlsAllowInvalidCertificates=True, serverSelectionTimeoutMS=5000)
 db = client['premium_url_bot']
-urls_col = db['urls']
-settings_col = db['settings']
-channels_col = db['channels']
-otp_col = db['otps']
-ad_links_col = db['ad_links']
-stats_col = db['stats']
+
+# কালেকশনগুলো ডিফাইন করা হয়েছে
+urls_col = db['urls']           # শর্ট লিংকের ডাটা রাখার জন্য
+settings_col = db['settings']   # সাইটের সেটিংস সেভ করার জন্য
+channels_col = db['channels']   # পার্টনার চ্যানেলের লিস্ট রাখার জন্য
+otp_col = db['otps']           # পাসওয়ার্ড রিসেট OTP এর জন্য
+ad_links_col = db['ad_links']   # ডাইরেক্ট অ্যাড লিংকের জন্য
+stats_col = db['stats']         # ভিজিটর স্ট্যাটাস বা অ্যানালিটিক্স এর জন্য
 
 # --- টেলিগ্রাম সেটিংস ---
+# পাসওয়ার্ড ভুলে গেলে এই বটের মাধ্যমে OTP যাবে
 TELEGRAM_BOT_TOKEN = "8552256920:AAF6iyUJjJNsCUBVHm_XrxCxtlbnJtqnF2U"
 
+# কালার থিম ম্যাপ (সাইটের কালার পরিবর্তনের জন্য)
 COLOR_MAP = {
     "red": {"text": "text-red-500", "bg": "bg-red-600", "border": "border-red-500", "hover": "hover:bg-red-700", "light_bg": "bg-red-50"},
     "orange": {"text": "text-orange-500", "bg": "bg-orange-600", "border": "border-orange-500", "hover": "hover:bg-orange-700", "light_bg": "bg-orange-50"},
@@ -38,6 +44,7 @@ COLOR_MAP = {
     "slate": {"text": "text-slate-400", "bg": "bg-slate-700", "border": "border-slate-500", "hover": "hover:bg-slate-800", "light_bg": "bg-slate-50"}
 }
 
+# ডিফল্ট সেটিংস লোড করা
 def get_settings():
     settings = settings_col.find_one()
     if not settings:
@@ -56,8 +63,10 @@ def get_settings():
         return default_settings
     return settings
 
+# লগইন চেক করার ফাংশন
 def is_logged_in(): return session.get('logged_in')
 
+# ভিজিটর ট্র্যাকিং ফাংশন (IP, Country, Device ট্র্যাক করে)
 def track_click(short_code, ad_link=None):
     ip = request.headers.get('X-Forwarded-For', request.remote_addr)
     if ip and ',' in ip: ip = ip.split(',')[0]
@@ -73,6 +82,7 @@ def track_click(short_code, ad_link=None):
         "device": device, "timestamp": datetime.now(), "date": datetime.now().strftime("%Y-%m-%d")
     })
 
+# পার্টনার চ্যানেলের লিস্ট তৈরি করার HTML
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
@@ -82,7 +92,7 @@ def get_channels_html(theme_color="sky"):
         html += f'<a href="{ch["link"]}" target="_blank" class="flex flex-col items-center gap-3 group transition hover:scale-105"><div><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider">{ch.get("name", "Join Channel")}</p></div><img src="{ch["logo"]}" class="w-full max-w-[320px] h-[180px] object-cover border-2 border-white/10 rounded-lg shadow-2xl"></a>'
     return html + '</div></div>'
 
-# --- API সিস্টেম ---
+# --- API সিস্টেম (অন্য ডেভেলপারদের আপনার সার্ভিস ব্যবহারের জন্য) ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
@@ -98,7 +108,7 @@ def api_system():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
     return request.host_url + sc if res_format == 'text' else jsonify({"status": "success", "shortenedUrl": request.host_url + sc})
 
-# --- হোম পেজ ---
+# --- হোম পেজ (যেখানে ইউজার লিঙ্ক শর্ট করবে) ---
 @app.route('/')
 def index():
     settings = get_settings()
@@ -114,7 +124,7 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
     return render_template_string(f'''<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-bold uppercase text-sm">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- এডমিন প্যানেল (Dashboard + Analytics + Settings) ---
+# --- এডমিন প্যানেল ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -123,7 +133,7 @@ def admin_panel():
     channels = list(channels_col.find())
     ad_links = list(ad_links_col.find())
     
-    # স্ট্যাটস প্রোসেসিং
+    # স্ট্যাটস প্রোসেসিং (Dashboard Analytics)
     today = datetime.now().strftime("%Y-%m-%d")
     total_views = stats_col.count_documents({})
     today_views = stats_col.count_documents({"date": today})
@@ -141,20 +151,26 @@ def admin_panel():
     <style> .tab-content { display: none; } .tab-content.active { display: block; } .active-btn { background: #1e293b !important; color: white !important; } 
     ::-webkit-scrollbar { height: 5px; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } </style>
     </head><body class="bg-slate-50 flex flex-col lg:flex-row min-h-screen font-sans">
-        <!-- Sidebar Navigation -->
+        
+        <!-- Sidebar Navigation (মেনুবার) -->
         <div class="w-full lg:w-72 bg-white border-b lg:border-r p-6 flex lg:flex-col overflow-x-auto lg:overflow-visible sticky top-0 z-50">
             <h2 class="hidden lg:block text-2xl font-black mb-10 text-blue-600 italic tracking-tighter">PREMIUM ADMIN</h2>
             <nav class="flex lg:flex-col gap-2 w-full">
+                <!-- ১. Dashboard: এখানে মোট ভিউ, আজকের ভিউ এবং চার্ট দেখা যায় -->
                 <button onclick="tab('dash')" id="btn-dash" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold active-btn">📊 Dashboard</button>
+                <!-- ২. Links: এখানে শর্ট করা লিংকের লিস্ট এবং ক্লিক সংখ্যা দেখা যায় -->
                 <button onclick="tab('links')" id="btn-links" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🔗 Links</button>
+                <!-- ৩. Ads: ডাইরেক্ট অ্যাড লিংক (যেমন Terra-Click) ম্যানেজ করার জায়গা -->
                 <button onclick="tab('ads')" id="btn-ads" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">💰 Ads</button>
+                <!-- ৪. Partners: পার্টনার চ্যানেলের নাম, লোগো এবং লিংক যুক্ত করার জায়গা -->
                 <button onclick="tab('partners')" id="btn-partners" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">📢 Partners</button>
+                <!-- ৫. Settings: সাইটের নাম, পাসওয়ার্ড, থিম, টাইম এবং অ্যাড কোড সেট করার জায়গা -->
                 <button onclick="tab('config')" id="btn-config" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">⚙️ Settings</button>
             </nav>
         </div>
 
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
-            <!-- TAB: DASHBOARD -->
+            <!-- TAB: DASHBOARD (মূল পরিসংখ্যান) -->
             <div id="dash" class="tab-content active space-y-8">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-blue-600 p-8 rounded-[40px] text-white shadow-xl"><p class="text-xs font-bold opacity-70">TOTAL VIEWS</p><h3 class="text-5xl font-black">{{total_views}}</h3></div>
@@ -171,12 +187,13 @@ def admin_panel():
                         </div>
                     </div>
                 </div>
+                <!-- Direct Ad Link Performance: কোন অ্যাড লিংকে কতবার ক্লিক হয়েছে তার স্ট্যাটস -->
                 <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-4 uppercase text-slate-400 text-sm">Direct Ad Link Performance</h4>
                     <div class="space-y-2">{% for as in ad_stats %}<div class="flex justify-between p-4 bg-slate-50 rounded-2xl text-sm"><span class="truncate pr-4">{{as.url}}</span><b class="text-emerald-600">{{as.count}} Clicks</b></div>{% endfor %}</div>
                 </div>
             </div>
 
-            <!-- TAB: LINKS -->
+            <!-- TAB: LINKS (লিংক লিস্ট) -->
             <div id="links" class="tab-content">
                 <div class="bg-white rounded-[40px] border shadow-sm overflow-x-auto">
                     <table class="w-full text-left text-sm"><thead class="bg-slate-50 font-bold uppercase text-slate-400"><tr><th class="p-6">Link</th><th class="p-6">Original URL</th><th class="p-6">Clicks</th></tr></thead>
@@ -184,7 +201,7 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB: ADS -->
+            <!-- TAB: ADS (ডাইরেক্ট অ্যাড ম্যানেজমেন্ট) -->
             <div id="ads" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
                     <h4 class="font-black mb-6">Manage Direct Ad Links</h4>
@@ -196,7 +213,7 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB: PARTNERS -->
+            <!-- TAB: PARTNERS (পার্টনার চ্যানেল যোগ করা) -->
             <div id="partners" class="tab-content">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
                     <h4 class="font-black mb-6">Official Channels</h4>
@@ -210,18 +227,24 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB: SETTINGS -->
+            <!-- TAB: SETTINGS (পুরো সাইটের কনফিগারেশন) -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-6">
                         <h4 class="font-black text-xl">General Settings</h4>
-                        <input type="text" name="site_name" value="{{s.site_name}}" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
+                        <!-- সাইটের নাম পরিবর্তন -->
+                        <input type="text" name="site_name" value="{{s.site_name}}" placeholder="Site Name" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="number" name="steps" value="{{s.steps}}" class="p-4 bg-slate-50 rounded-2xl">
-                            <input type="number" name="timer_seconds" value="{{s.timer_seconds}}" class="p-4 bg-slate-50 rounded-2xl">
+                            <!-- স্টেপ সংখ্যা (কতবার নেক্সট বাটনে ক্লিক করতে হবে) -->
+                            <input type="number" name="steps" value="{{s.steps}}" placeholder="Steps" class="p-4 bg-slate-50 rounded-2xl">
+                            <!-- টাইমার সেকেন্ড (বাটন আসার আগে কতক্ষণ অপেক্ষা করতে হবে) -->
+                            <input type="number" name="timer_seconds" value="{{s.timer_seconds}}" placeholder="Seconds" class="p-4 bg-slate-50 rounded-2xl">
+                            <!-- হোম পেজের কালার সেট করা -->
                             <select name="main_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.main_theme == k %}selected{% endif %}>HOME: {{k|upper}}</option>{% endfor %}</select>
+                            <!-- শর্ট লিংক পেজের কালার সেট করা -->
                             <select name="step_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.step_theme == k %}selected{% endif %}>STEP: {{k|upper}}</option>{% endfor %}</select>
                         </div>
+                        <!-- API Key সেকশন -->
                         <div class="bg-orange-50 p-6 rounded-3xl space-y-4">
                             <p class="text-xs font-bold text-orange-600 uppercase">API Management</p>
                             <input type="text" id="apiKey" name="api_key" value="{{s.api_key}}" class="w-full p-4 bg-white rounded-xl text-xs font-mono border outline-none">
@@ -230,15 +253,19 @@ def admin_panel():
                                 <button type="button" onclick="genApi()" class="flex-1 bg-orange-600 text-white py-3 rounded-lg text-xs font-bold">REGENERATE</button>
                             </div>
                         </div>
-                        <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
+                        <!-- টেলিগ্রাম আইডি এবং পাসওয়ার্ড রিসেট -->
+                        <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram Chat ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full p-4 bg-red-50 rounded-2xl font-bold">
                     </div>
+                    
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-4">
                         <h4 class="font-black text-xl text-emerald-600">Monetization Scripts</h4>
+                        <!-- Direct Click Limit: একবার কন্টিনিউ করতে কয়বার ডাইরেক্ট অ্যাড ওপেন হবে -->
                         <input type="number" name="direct_click_limit" value="{{s.direct_click_limit}}" class="w-full p-4 bg-blue-50 rounded-2xl font-bold" placeholder="Clicks per direct ad">
+                        <!-- বিভিন্ন প্রকার অ্যাড স্ক্রিপ্ট (Adsterra/PopCash etc) বসানোর জায়গা -->
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.popunder}}</textarea>
                         <textarea name="banner" placeholder="Banner Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.banner}}</textarea>
-                        <textarea name="social_bar" placeholder="Social Bar" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
+                        <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
                         <textarea name="native" placeholder="Native Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.native}}</textarea>
                         <button class="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-xl shadow-xl">SAVE ALL CHANGES</button>
                     </div>
@@ -272,7 +299,7 @@ def admin_panel():
         devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, s=settings, 
         colors=COLOR_MAP.keys(), chart_labels=chart_labels, chart_values=chart_values)
 
-# --- এডমিন অ্যাকশনস রুট ---
+# --- এডমিন অ্যাকশনস (ডাটা সেভ করার রুটসমূহ) ---
 @app.route('/admin/add_ad_link', methods=['POST'])
 def add_ad_link():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -321,17 +348,20 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক ---
+# --- রিডাইরেক্ট লজিক (শর্ট লিংকে ক্লিক করলে কী হবে) ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
     settings = get_settings()
     url_data = urls_col.find_one({"short_code": short_code})
     if not url_data: return "404 Not Found", 404
+    
+    # সব স্টেপ শেষ হলে মেইন লিংকে পাঠাবে
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
         track_click(short_code)
         return redirect(url_data['long_url'])
+    
     ads = [l['url'] for l in ad_links_col.find()]
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
     return render_template_string('''
@@ -364,7 +394,7 @@ def track_ajax():
     track_click(request.args.get('sc'), request.args.get('ad'))
     return "ok"
 
-# --- লগইন ও পাসওয়ার্ড রিকভারি ---
+# --- লগইন ও পাসওয়ার্ড রিকভারি (টেলিগ্রাম এর মাধ্যমে) ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
