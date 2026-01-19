@@ -19,6 +19,7 @@ urls_col = db['urls']
 settings_col = db['settings']
 channels_col = db['channels']
 otp_col = db['otps']
+ad_links_col = db['ad_links'] # নতুন কালেকশন: আনলিমিটেড এড লিঙ্কের জন্য
 
 # --- টেলিগ্রাম সেটিংস ---
 TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
@@ -115,7 +116,7 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "1"})
     return render_template_string(f'''<html><head><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড (Tab Design) ---
+# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -123,6 +124,7 @@ def admin_panel():
     all_urls = list(urls_col.find().sort("_id", -1))
     total_clicks = sum(u.get('clicks', 0) for u in all_urls)
     channels = list(channels_col.find())
+    ad_links = list(ad_links_col.find()) # আনলিমিটেড এড লিঙ্কের লিস্ট
     theme_options = sorted(COLOR_MAP.keys())
 
     return render_template_string(f'''
@@ -137,6 +139,7 @@ def admin_panel():
             <nav class="space-y-3 flex-1">
                 <button onclick="showTab('overview')" id="tab-overview-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3 active-tab">📊 Analytics</button>
                 <button onclick="showTab('config')" id="tab-config-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">⚙️ Design & Setup</button>
+                <button onclick="showTab('ads_tab')" id="tab-ads_tab-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">💰 Monetization</button>
                 <button onclick="showTab('partners')" id="tab-partners-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">📢 Partnerships</button>
             </nav>
             <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout Account</a>
@@ -213,7 +216,7 @@ def admin_panel():
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-4">
                         <h4 class="font-black text-xl text-emerald-600">💰 Monetization (Scripts)</h4>
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="url" name="direct_link" value="{settings['direct_link']}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Direct Link">
+                            <p class="text-xs col-span-2 text-slate-400 font-bold uppercase">Click limit below is for the random direct links</p>
                             <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Limit">
                         </div>
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['popunder']}</textarea>
@@ -225,7 +228,31 @@ def admin_panel():
                 </form>
             </div>
 
-            <!-- TAB 3: PARTNERS (Updated with Name and 320x180 Banner) -->
+            <!-- TAB 3: MONETIZATION (UNLIMITED DIRECT LINKS) -->
+            <div id="ads_tab" class="tab-content space-y-8">
+                <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
+                    <h4 class="font-black text-xl text-slate-900 mb-6 uppercase tracking-tighter">🔗 Manage Direct Ad Links (Unlimited)</h4>
+                    <form action="/admin/add_ad_link" method="POST" class="flex flex-col md:flex-row gap-4 mb-8">
+                        <input type="url" name="ad_url" placeholder="Paste Ad Link (Direct Link/CPA Link)..." required class="flex-1 p-4 bg-slate-50 rounded-2xl border-none font-bold">
+                        <button class="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase hover:bg-emerald-700 transition">Add Link</button>
+                    </form>
+
+                    <div class="space-y-4">
+                        {" ".join([f'''
+                        <div class="flex items-center justify-between bg-slate-50 p-6 rounded-[30px] border border-slate-100">
+                            <div class="truncate flex-1 mr-4">
+                                <p class="text-xs font-bold text-slate-400 uppercase">Direct Ad Link</p>
+                                <p class="font-mono text-sm text-slate-700 truncate">{l['url']}</p>
+                            </div>
+                            <a href="/admin/delete_ad_link/{l['_id']}" class="bg-red-50 text-red-600 px-6 py-2 rounded-xl text-xs font-black uppercase hover:bg-red-100 transition">Delete</a>
+                        </div>''' for l in ad_links])}
+                        
+                        { '<p class="text-center text-slate-400 py-10 font-bold italic">No ad links added. User will be sent to google.com by default.</p>' if not ad_links else '' }
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: PARTNERS -->
             <div id="partners" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
                     <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
@@ -277,6 +304,19 @@ def admin_panel():
     ''')
 
 # --- এডমিন অ্যাকশন ---
+@app.route('/admin/add_ad_link', methods=['POST'])
+def add_ad_link():
+    if not is_logged_in(): return redirect(url_for('login'))
+    url = request.form.get('ad_url')
+    if url: ad_links_col.insert_one({"url": url})
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete_ad_link/<id>')
+def delete_ad_link(id):
+    if not is_logged_in(): return redirect(url_for('login'))
+    ad_links_col.delete_one({"_id": ObjectId(id)})
+    return redirect(url_for('admin_panel'))
+
 @app.route('/admin/add_channel', methods=['POST'])
 def add_channel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -304,7 +344,6 @@ def update_settings():
         "banner": request.form.get('banner'),
         "social_bar": request.form.get('social_bar'),
         "native": request.form.get('native'),
-        "direct_link": request.form.get('direct_link'),
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme'),
@@ -315,16 +354,21 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক ---
+# --- রিডাইরেক্ট লজিক (র‍্যান্ডম লিঙ্ক সহ) ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
     settings = get_settings()
     url_data = urls_col.find_one({"short_code": short_code})
     if not url_data: return "404 - Link Not Found", 404
+    
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
         return redirect(url_data['long_url'])
+    
+    # --- র‍্যান্ডম এড লিঙ্ক লজিক ---
+    all_ads = list(ad_links_col.find())
+    selected_ad_url = random.choice(all_ads)['url'] if all_ads else "https://google.com"
     
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
     return render_template_string(f'''
@@ -348,7 +392,7 @@ def handle_ad_steps(short_code):
             let timeLeft = {settings['timer_seconds']};
             let totalAdClicks = 0;
             let adLimit = {settings.get('direct_click_limit', 1)};
-            let adUrl = "{settings['direct_link']}";
+            let adUrl = "{selected_ad_url}";
             
             const timerBox = document.getElementById('timer_box');
             const mainBtn = document.getElementById('main_btn');
