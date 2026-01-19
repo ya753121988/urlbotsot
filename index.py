@@ -13,6 +13,10 @@ app = Flask(__name__)
 # এটি সেশন সিকিউরিটির জন্য ব্যবহৃত হয়
 app.secret_key = os.environ.get("SECRET_KEY", "premium-super-secret-key-2025")
 
+# --- সেশন দীর্ঘস্থায়ী করার সেটিংস ---
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30) # ৩০ দিনের জন্য লগইন সেভ থাকবে
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+
 # --- ডাটাবেস কানেকশন ---
 # MongoDB এর সাথে কানেক্ট করার জন্য URI ব্যবহার করা হয়েছে
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://user:pass@cluster.mongodb.net/test")
@@ -399,8 +403,10 @@ def track_ajax():
 # --- লগইন ও পাসওয়ার্ড রিকভারি (টেলিগ্রাম এর মাধ্যমে) ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if is_logged_in(): return redirect(url_for('admin_panel')) # আগে থেকেই লগইন থাকলে প্যানেলে পাঠাবে
     if request.method == 'POST':
         if check_password_hash(get_settings()['admin_password'], request.form.get('password')):
+            session.permanent = True # এই লাইনের মাধ্যমে লগইন ৩০ দিন সেভ থাকবে
             session['logged_in'] = True; return redirect(url_for('admin_panel'))
     return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;padding:20px;"><form method="POST" style="background:white;padding:40px;border-radius:30px;text-align:center;width:100%;max-width:350px;"><h2 style="font-weight:900;margin-bottom:30px;">ADMIN LOGIN</h2><input type="password" name="password" placeholder="Key" style="width:100%;padding:15px;margin-bottom:15px;border:1px solid #ddd;border-radius:10px;text-align:center;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:10px;font-weight:900;">LOGIN</button><a href="/forgot-password" style="display:block;margin-top:20px;font-size:12px;color:#3b82f6;text-decoration:none;">Forgot Passkey?</a></form></body>')
 
