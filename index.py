@@ -518,14 +518,14 @@ def handle_ad_steps(short_code):
 def login():
     if request.method == 'POST':
         if check_password_hash(get_settings()['admin_password'], request.form.get('password')):
-            session.permanent = True  # [FIX] সেশন স্থায়ী করা হয়েছে
+            session.permanent = True  # সেশন স্থায়ী করা হলো
             session['logged_in'] = True
             return redirect(url_for('admin_panel'))
     return render_template_string('''<body style="background:#0f172a;height:100vh;display:grid;place-items:center;font-family:sans-serif"><form method="POST" style="background:white;padding:40px;border-radius:30px;text-align:center"><h2 style="font-weight:900;margin-bottom:20px">ADMIN ACCESS</h2><input type="password" name="password" placeholder="Passkey" style="padding:15px;border:1px solid #ddd;border-radius:10px;width:100%;margin-bottom:15px"><button style="padding:15px;width:100%;background:black;color:white;border:none;border-radius:10px;font-weight:bold">LOGIN</button><a href="/forgot-password" style="display:block;margin-top:15px;font-size:12px;color:blue">Forgot?</a></form></body>''')
 
 @app.route('/logout')
 def logout():
-    session.clear() # [FIX] সেশন সম্পূর্ণ ক্লিয়ার করা হয়েছে
+    session.clear() # সেশন সম্পূর্ণ ক্লিয়ার করা হলো
     return redirect(url_for('login'))
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
