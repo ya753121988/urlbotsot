@@ -20,12 +20,13 @@ urls_col = db['urls']
 settings_col = db['settings']
 channels_col = db['channels']
 otp_col = db['otps']
-ad_links_col = db['ad_links'] # নতুন কালেকশন: আনলিমিটেড এড লিঙ্কের জন্য
+ad_links_col = db['ad_links']
+stats_col = db['stats'] # নতুন কালেকশন: বিস্তারিত ট্র্যাকিং এর জন্য
 
 # --- টেলিগ্রাম সেটিংস ---
 TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
 
-# --- থিম কালার ম্যাপ (Design Options) ---
+# --- থিম কালার ম্যাপ ---
 COLOR_MAP = {
     "red": {"text": "text-red-500", "bg": "bg-red-600", "border": "border-red-500", "hover": "hover:bg-red-700", "light_bg": "bg-red-50"},
     "orange": {"text": "text-orange-500", "bg": "bg-orange-600", "border": "border-orange-500", "hover": "hover:bg-orange-700", "light_bg": "bg-orange-50"},
@@ -49,7 +50,6 @@ def get_settings():
             "admin_password": generate_password_hash("admin123"),
             "api_key": ''.join(random.choices(string.ascii_lowercase + string.digits, k=40)),
             "popunder": "", "banner": "", "social_bar": "", "native": "",
-            "direct_link": "https://google.com", 
             "direct_click_limit": 1,
             "main_theme": "sky", "step_theme": "blue"
         }
@@ -60,7 +60,37 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
-# --- চ্যানেল বক্স জেনারেটর (320x180 ব্যানার স্টাইল) ---
+# --- ট্র্যাকিং ফাংশন ---
+def track_click(short_code, ad_link=None):
+    # আইপি থেকে দেশ বের করা (Free API)
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+    country = "Unknown"
+    try:
+        res = requests.get(f"http://ip-api.com/json/{ip}", timeout=2).json()
+        if res.get('status') == 'success':
+            country = res.get('country', 'Unknown')
+    except: pass
+
+    # ডিভাইস ডিটেকশন
+    ua = request.user_agent
+    device = "Desktop/Laptop"
+    if ua.platform in ['android', 'iphone', 'ipad']:
+        device = "Mobile"
+    
+    stats_col.insert_one({
+        "short_code": short_code,
+        "ad_link": ad_link,
+        "ip": ip,
+        "country": country,
+        "device": device,
+        "platform": ua.platform or "Unknown",
+        "browser": ua.browser or "Unknown",
+        "referrer": request.referrer or "Direct",
+        "timestamp": datetime.now(),
+        "date": datetime.now().strftime("%Y-%m-%d")
+    })
+
+# --- চ্যানেল বক্স জেনারেটর ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
@@ -112,63 +142,124 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "1"})
     return render_template_string(f'''<html><head><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড ---
+# --- এডমিন ড্যাশবোর্ড ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
     settings = get_settings()
     all_urls = list(urls_col.find().sort("_id", -1))
-    total_clicks = sum(u.get('clicks', 0) for u in all_urls)
     channels = list(channels_col.find())
-    ad_links = list(ad_links_col.find()) # আনলিমিটেড এড লিঙ্কের তালিকা
+    ad_links = list(ad_links_col.find())
     theme_options = sorted(COLOR_MAP.keys())
+
+    # --- অ্যানালিটিক্স ডাটা প্রোসেসিং ---
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    total_clicks = stats_col.count_documents({})
+    today_clicks = stats_col.count_documents({"date": today_str})
+    
+    # লাস্ট ৭ দিনের চার্ট ডাটা
+    chart_labels = []
+    chart_data = []
+    for i in range(6, -1, -1):
+        day = (datetime.now() - timedelta(days=i)).strftime("%Y-%m-%d")
+        chart_labels.append(day)
+        chart_data.append(stats_col.count_documents({"date": day}))
+
+    # কান্ট্রি ও ডিভাইস স্ট্যাটস
+    countries = list(stats_col.aggregate([{"$group": {"_id": "$country", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}, {"$limit": 5}]))
+    devices = list(stats_col.aggregate([{"$group": {"_id": "$device", "count": {"$sum": 1}}}, {"$sort": {"count": -1}}]))
+    
+    # কোন এড লিঙ্কে কত ক্লিক (Direct Ads Tracking)
+    ad_click_stats = []
+    for ad in ad_links:
+        count = stats_col.count_documents({"ad_link": ad['url']})
+        ad_click_stats.append({"url": ad['url'], "count": count})
 
     return render_template_string(f'''
     <html><head><script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
     <style> body {{ font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }} .active-tab {{ background: #1e293b !important; color: white !important; }} .tab-content {{ display: none; }} .tab-content.active {{ display: block; }} </style>
     </head>
     <body class="flex flex-col lg:flex-row min-h-screen">
-        <!-- Sidebar Navigation -->
         <div class="lg:w-72 bg-white border-r p-8 flex flex-col shadow-sm">
             <h2 class="text-2xl font-black text-slate-900 mb-12 italic tracking-tighter">PREMIUM <span class="text-blue-600">ADMIN</span></h2>
             <nav class="space-y-3 flex-1">
-                <button onclick="showTab('overview')" id="tab-overview-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3 active-tab">📊 Analytics</button>
-                <button onclick="showTab('config')" id="tab-config-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">⚙️ Design & Setup</button>
-                <button onclick="showTab('ads_tab')" id="tab-ads_tab-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">💰 Monetization</button>
-                <button onclick="showTab('partners')" id="tab-partners-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">📢 Partnerships</button>
+                <button onclick="showTab('dashboard')" id="tab-dashboard-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3 active-tab">🏠 Dashboard</button>
+                <button onclick="showTab('overview')" id="tab-overview-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">🔗 Links List</button>
+                <button onclick="showTab('config')" id="tab-config-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">⚙️ Design System</button>
+                <button onclick="showTab('ads_tab')" id="tab-ads_tab-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">💰 Ads Manager</button>
+                <button onclick="showTab('partners')" id="tab-partners-btn" class="w-full text-left p-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-100 transition flex items-center gap-3">📢 Partners</button>
             </nav>
             <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout Account</a>
         </div>
 
-        <!-- Content Area -->
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
             
-            <!-- TAB 1: OVERVIEW -->
-            <div id="overview" class="tab-content active space-y-10">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
-                        <p class="text-slate-400 text-xs font-bold uppercase mb-1">Total Generated Links</p>
-                        <h3 class="text-5xl font-black text-slate-900">{len(all_urls)}</h3>
-                    </div>
-                    <div class="bg-blue-600 p-8 rounded-[40px] shadow-lg text-white">
-                        <p class="text-blue-200 text-xs font-bold uppercase mb-1">Total Redirect Clicks</p>
+            <!-- TAB: DASHBOARD (The New Analytics) -->
+            <div id="dashboard" class="tab-content active space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-blue-600 p-8 rounded-[40px] text-white shadow-xl">
+                        <p class="text-blue-100 text-xs font-bold uppercase mb-1">Lifetime Views</p>
                         <h3 class="text-5xl font-black">{total_clicks}</h3>
                     </div>
+                    <div class="bg-emerald-500 p-8 rounded-[40px] text-white shadow-xl">
+                        <p class="text-emerald-100 text-xs font-bold uppercase mb-1">Today's Views</p>
+                        <h3 class="text-5xl font-black">{today_clicks}</h3>
+                    </div>
+                    <div class="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm">
+                        <p class="text-slate-400 text-xs font-bold uppercase mb-1">Active Links</p>
+                        <h3 class="text-5xl font-black text-slate-800">{len(all_urls)}</h3>
+                    </div>
                 </div>
+
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
+                        <h4 class="font-black text-slate-800 mb-6 uppercase tracking-wider">7-Day Traffic Trend</h4>
+                        <canvas id="trafficChart"></canvas>
+                    </div>
+                    <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
+                        <h4 class="font-black text-slate-800 mb-6 uppercase tracking-wider">Traffic by Device</h4>
+                        <div class="space-y-4">
+                            {"".join([f'<div class="flex justify-between items-center p-4 bg-slate-50 rounded-2xl"><span class="font-bold text-slate-600">{d["_id"]}</span><span class="bg-blue-100 text-blue-600 px-4 py-1 rounded-full font-black">{d["count"]}</span></div>' for d in devices])}
+                        </div>
+                        <h4 class="font-black text-slate-800 mt-8 mb-6 uppercase tracking-wider">Top Countries</h4>
+                        <div class="space-y-4">
+                            {"".join([f'<div class="flex justify-between items-center p-4 bg-orange-50 rounded-2xl"><span class="font-bold text-slate-600">{c["_id"]}</span><span class="bg-orange-600 text-white px-4 py-1 rounded-full font-black">{c["count"]}</span></div>' for c in countries])}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
+                    <h4 class="font-black text-slate-800 mb-6 uppercase tracking-wider">Direct Ad Links Performance</h4>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-[10px] font-black uppercase text-slate-400">
+                                <tr><th class="p-6">Ad Link URL</th><th class="p-6 text-center">Total Clicks</th></tr>
+                            </thead>
+                            <tbody class="divide-y text-sm font-bold text-slate-700">
+                                {" ".join([f'<tr class="hover:bg-slate-50"><td class="p-6 truncate max-w-xs">{a["url"]}</td><td class="p-6 text-center"><span class="text-emerald-600">{a["count"]}</span></td></tr>' for a in ad_click_stats])}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: OVERVIEW (Link List) -->
+            <div id="overview" class="tab-content space-y-10">
                 <div class="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
                     <table class="w-full text-left">
-                        <thead class="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                            <tr><th class="p-6">Time</th><th class="p-6">Short Link</th><th class="p-6 text-center">Clicks</th></tr>
+                        <thead class="bg-slate-50 text-[10px] font-black uppercase text-slate-400">
+                            <tr><th class="p-6">Time</th><th class="p-6">Short Link</th><th class="p-6">Original Link</th><th class="p-6 text-center">Total Clicks</th></tr>
                         </thead>
                         <tbody class="divide-y text-sm font-bold text-slate-700">
-                            {" ".join([f'<tr class="hover:bg-slate-50 transition"><td class="p-6 text-xs text-slate-400">{u.get("created_at")}</td><td class="p-6 text-blue-600">/{u["short_code"]}</td><td class="p-6 text-center"><span class="bg-slate-100 px-4 py-1 rounded-full">{u["clicks"]}</span></td></tr>' for u in all_urls[:15]])}
+                            {" ".join([f'<tr class="hover:bg-slate-50 transition"><td class="p-6 text-xs text-slate-400">{u.get("created_at")}</td><td class="p-6 text-blue-600">/{u["short_code"]}</td><td class="p-6 truncate max-w-xs text-slate-400">{u["long_url"]}</td><td class="p-6 text-center"><span class="bg-slate-100 px-4 py-1 rounded-full">{stats_col.count_documents({{"short_code": u["short_code"]}})}</span></td></tr>' for u in all_urls[:30]])}
                         </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- TAB 2: CONFIGURATIONS -->
+            <!-- TAB: CONFIGURATIONS -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-6">
@@ -194,78 +285,71 @@ def admin_panel():
                             <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Timer Seconds">
                         </div>
 
-                        <!-- API Key Management -->
                         <h4 class="font-black text-xl text-slate-900 pt-4">🔑 API Management</h4>
                         <div class="bg-orange-50 p-6 rounded-[30px] border border-orange-100 space-y-4">
-                            <label class="text-xs font-bold text-orange-600 block uppercase">API Shortener Token</label>
-                            <input type="text" id="api_key_field" name="api_key" value="{settings['api_key']}" class="w-full p-4 bg-white rounded-xl font-mono text-xs border border-orange-200 outline-none" placeholder="Your API Token">
+                            <input type="text" id="api_key_field" name="api_key" value="{settings['api_key']}" class="w-full p-4 bg-white rounded-xl font-mono text-xs border border-orange-200 outline-none" readonly>
                             <div class="flex gap-2">
-                                <button type="button" onclick="copyAPI()" class="flex-1 bg-white border border-orange-200 text-orange-600 p-3 rounded-xl text-xs font-black hover:bg-orange-100 transition">COPY KEY</button>
-                                <button type="button" onclick="generateAPI()" class="flex-1 bg-orange-600 text-white p-3 rounded-xl text-xs font-black hover:bg-orange-700 shadow-md transition">REGENERATE</button>
+                                <button type="button" onclick="copyAPI()" class="flex-1 bg-white border border-orange-200 text-orange-600 p-3 rounded-xl text-xs font-black">COPY KEY</button>
+                                <button type="button" onclick="generateAPI()" class="flex-1 bg-orange-600 text-white p-3 rounded-xl text-xs font-black">REGENERATE</button>
                             </div>
                         </div>
 
                         <input type="text" name="admin_telegram_id" value="{settings.get('admin_telegram_id','')}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Telegram Admin ID">
-                        <input type="password" name="new_password" class="w-full p-4 bg-red-50 rounded-2xl border-none" placeholder="Update Admin Password">
+                        <input type="password" name="new_password" class="w-full p-4 bg-red-50 rounded-2xl border-none" placeholder="Update Password">
                     </div>
 
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-4">
-                        <h4 class="font-black text-xl text-emerald-600">💰 Monetization (Scripts)</h4>
+                        <h4 class="font-black text-xl text-emerald-600">💰 Monetization</h4>
                         <div class="grid grid-cols-2 gap-4">
-                            <p class="text-xs col-span-2 text-slate-400 font-bold uppercase">Click limit below is for the random direct links</p>
-                            <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Limit">
+                            <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Direct Ad Click Limit">
                         </div>
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['popunder']}</textarea>
                         <textarea name="banner" placeholder="Banner Ad Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['banner']}</textarea>
                         <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['social_bar']}</textarea>
-                        <textarea name="native" placeholder="Native/Bottom Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['native']}</textarea>
-                        <button class="w-full bg-slate-900 text-white p-6 rounded-[30px] font-black text-xl shadow-2xl hover:scale-[1.02] transition mt-4">Save All Changes</button>
+                        <textarea name="native" placeholder="Native Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['native']}</textarea>
+                        <button class="w-full bg-slate-900 text-white p-6 rounded-[30px] font-black text-xl shadow-2xl hover:scale-[1.02] transition">Save Changes</button>
                     </div>
                 </form>
             </div>
 
-            <!-- TAB 3: MONETIZATION (UNLIMITED DIRECT LINKS) -->
+            <!-- TAB: ADS MANAGER -->
             <div id="ads_tab" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
-                    <h4 class="font-black text-xl text-slate-900 mb-6 uppercase tracking-tighter">🔗 Manage Direct Ad Links (Unlimited)</h4>
+                    <h4 class="font-black text-xl text-slate-900 mb-6 uppercase tracking-tighter">🔗 Direct Ad Links</h4>
                     <form action="/admin/add_ad_link" method="POST" class="flex flex-col md:flex-row gap-4 mb-8">
-                        <input type="url" name="ad_url" placeholder="Paste Ad Link (Direct Link/CPA Link)..." required class="flex-1 p-4 bg-slate-50 rounded-2xl border-none font-bold">
-                        <button class="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase hover:bg-emerald-700 transition">Add Link</button>
+                        <input type="url" name="ad_url" placeholder="Paste Direct Ad URL..." required class="flex-1 p-4 bg-slate-50 rounded-2xl border-none">
+                        <button class="bg-emerald-600 text-white px-10 py-4 rounded-2xl font-black uppercase">Add Link</button>
                     </form>
-
                     <div class="space-y-4">
                         {" ".join([f'''
                         <div class="flex items-center justify-between bg-slate-50 p-6 rounded-[30px] border border-slate-100">
                             <div class="truncate flex-1 mr-4">
-                                <p class="text-xs font-bold text-slate-400 uppercase">Direct Ad Link</p>
                                 <p class="font-mono text-sm text-slate-700 truncate">{l['url']}</p>
                             </div>
-                            <a href="/admin/delete_ad_link/{l['_id']}" class="bg-red-50 text-red-600 px-6 py-2 rounded-xl text-xs font-black uppercase hover:bg-red-100 transition">Delete</a>
+                            <a href="/admin/delete_ad_link/{l['_id']}" class="bg-red-50 text-red-600 px-6 py-2 rounded-xl text-xs font-black">DELETE</a>
                         </div>''' for l in ad_links])}
-                        
-                        { '<p class="text-center text-slate-400 py-10 font-bold italic">No ad links added. User will be sent to google.com by default.</p>' if not ad_links else '' }
                     </div>
                 </div>
             </div>
 
-            <!-- TAB 4: PARTNERS -->
+            <!-- TAB: PARTNERS -->
             <div id="partners" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
                     <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
                     <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
                         <input type="text" name="name" placeholder="Channel Name" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
-                        <input type="url" name="logo" placeholder="Banner URL (468x60)" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
+                        <input type="url" name="logo" placeholder="Banner Logo URL" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
                         <input type="url" name="link" placeholder="Invite Link" required class="w-full p-4 bg-slate-50 rounded-2xl border-none">
-                        <button class="bg-blue-600 text-white p-4 rounded-2xl font-black uppercase shadow-lg hover:bg-blue-700 transition">Add Channel</button>
+                        <button class="bg-blue-600 text-white p-4 rounded-2xl font-black uppercase">Add Channel</button>
                     </form>
                     <div class="mt-12 space-y-8">
                         {" ".join([f'''
-                        <div class="flex flex-col md:flex-row items-center gap-6 bg-slate-50 p-6 rounded-[30px] border border-slate-100 relative">
+                        <div class="flex flex-col md:flex-row items-center gap-6 bg-slate-50 p-6 rounded-[30px] border border-slate-100">
                             <div class="flex-1">
                                 <p class="text-sm font-black text-slate-900 uppercase mb-2">{c.get('name', 'N/A')}</p>
-                                <img src="{c["logo"]}" style="width: 320px; height: 180px;" class="object-cover rounded-lg shadow-sm border border-slate-200">
+                                <img src="{c["logo"]}" style="width: 320px; height: 180px;" class="object-cover rounded-lg shadow-sm">
                             </div>
-                            <a href="/admin/delete_channel/{c["_id"]}" class="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-md">Delete</a>
+                            <a href="/admin/delete_channel/{c["_id"]}" class="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold">Delete</a>
                         </div>''' for c in channels])}
                     </div>
                 </div>
@@ -279,6 +363,27 @@ def admin_panel():
                 document.getElementById(tabId).classList.add('active');
                 document.getElementById('tab-' + tabId + '-btn').classList.add('active-tab');
             }}
+
+            // Chart Setup
+            const ctx = document.getElementById('trafficChart').getContext('2d');
+            new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: {json.dumps(chart_labels)},
+                    datasets: [{{
+                        label: 'Daily Views',
+                        data: {json.dumps(chart_data)},
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 4,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#fff'
+                    }}]
+                }},
+                options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true, grid: {{ display: false }} }}, x: {{ grid: {{ display: false }} }} }} }}
+            }});
 
             function copyAPI() {{
                 const copyText = document.getElementById("api_key_field");
@@ -299,7 +404,7 @@ def admin_panel():
     </body></html>
     ''')
 
-# --- এডমিন অ্যাকশন ---
+# --- এডমিন অ্যাকশন রুটস ---
 @app.route('/admin/add_ad_link', methods=['POST'])
 def add_ad_link():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -329,8 +434,7 @@ def delete_channel(id):
 @app.post('/admin/update')
 def update_settings():
     if not is_logged_in(): return redirect(url_for('login'))
-    raw_api_key = request.form.get('api_key', '')
-    cleaned_api_key = raw_api_key.strip()
+    raw_api_key = request.form.get('api_key', '').strip()
     d = {
         "site_name": request.form.get('site_name'),
         "admin_telegram_id": request.form.get('admin_telegram_id'),
@@ -343,14 +447,14 @@ def update_settings():
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme'),
-        "api_key": cleaned_api_key if cleaned_api_key else get_settings()['api_key']
+        "api_key": raw_api_key if raw_api_key else get_settings()['api_key']
     }
     new_pass = request.form.get('new_password')
     if new_pass and len(new_pass) > 2: d["admin_password"] = generate_password_hash(new_pass)
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক (র‍্যান্ডম লিঙ্ক সহ) ---
+# --- রিডাইরেক্ট লজিক ও ট্র্যাকিং ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -358,13 +462,13 @@ def handle_ad_steps(short_code):
     url_data = urls_col.find_one({"short_code": short_code})
     if not url_data: return "404 - Link Not Found", 404
     
+    # শেষ স্টেপে ভিউ কাউন্ট করা
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
+        track_click(short_code) # বিস্তারিত অ্যানালিটিক্স লগ
         return redirect(url_data['long_url'])
     
-    # --- প্রতি রিলোডে র‍্যান্ডম এড লিঙ্ক সিলেক্ট করা ---
     all_ads = [l['url'] for l in ad_links_col.find()]
-    # জাভাস্ক্রিপ্ট পুলে পাঠানোর জন্য JSON এ রূপান্তর
     ads_json = json.dumps(all_ads)
     
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
@@ -377,9 +481,7 @@ def handle_ad_steps(short_code):
         <div class="bg-white p-12 md:p-20 rounded-[70px] shadow-3xl text-center max-w-2xl w-full border-t-[16px] {tc['border']} my-4">
             <p class="text-xl md:text-2xl font-black {tc['text']} uppercase tracking-widest mb-4">Step {step} of {settings['steps']}</p>
             <h2 class="text-3xl md:text-5xl font-black text-slate-900 mb-8 tracking-tighter italic">Verifying Status...</h2>
-            
-            <div id="timer_box" class="text-7xl md:text-8xl font-black {tc['text']} mb-8 {tc['light_bg']} w-40 h-40 md:w-48 md:h-48 flex items-center justify-center rounded-full mx-auto border-8 {tc['border']} italic shadow-inner">{settings['timer_seconds']}</div>
-            
+            <div id="timer_box" class="text-7xl md:text-8xl font-black {tc['text']} mb-8 {tc['light_bg']} w-40 h-40 md:w-48 md:h-48 flex items-center justify-center rounded-full mx-auto border-8 {tc['border']} shadow-inner">{settings['timer_seconds']}</div>
             <button id="main_btn" onclick="handleClick()" class="hidden w-full {tc['bg']} text-white py-8 rounded-[40px] font-black text-3xl uppercase shadow-2xl transition hover:scale-105">Continue</button>
         </div>
         <div class="mt-4">{settings['native']}</div>
@@ -389,7 +491,7 @@ def handle_ad_steps(short_code):
             let timeLeft = {settings['timer_seconds']};
             let totalAdClicks = 0;
             let adLimit = {settings.get('direct_click_limit', 1)};
-            let adPool = {ads_json}; // ডাটাবেস থেকে আসা সমস্ত লিঙ্কের তালিকা
+            let adPool = {ads_json};
             
             const timerBox = document.getElementById('timer_box');
             const mainBtn = document.getElementById('main_btn');
@@ -415,8 +517,11 @@ def handle_ad_steps(short_code):
 
             function handleClick() {{
                 if (totalAdClicks < adLimit) {{
-                    // পুল থেকে র‍্যান্ডম একটি লিঙ্ক নেওয়া (এটি প্রতি ক্লিকে র‍্যান্ডম হবে)
                     let randomUrl = adPool.length > 0 ? adPool[Math.floor(Math.random() * adPool.length)] : "https://google.com";
+                    
+                    // ব্যাকগ্রাউন্ডে এড ক্লিক ট্র্যাকিং
+                    fetch('/track_ad_click?ad_url=' + encodeURIComponent(randomUrl) + '&sc={short_code}');
+                    
                     window.open(randomUrl, '_blank');
                     totalAdClicks++;
                     refreshBtnText();
@@ -426,6 +531,14 @@ def handle_ad_steps(short_code):
             }}
         </script>
     </body></html>''')
+
+# এড ক্লিক ট্র্যাকিং রুট
+@app.route('/track_ad_click')
+def track_ad_click():
+    sc = request.args.get('sc')
+    ad_url = request.args.get('ad_url')
+    if sc: track_click(sc, ad_url)
+    return "ok"
 
 # --- লগইন ও রিকভারি ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -450,7 +563,7 @@ def forgot_password():
         if tg_id and tg_id == settings.get('admin_telegram_id'):
             otp = str(random.randint(100000, 999999))
             otp_col.update_one({"id": "admin_reset"}, {"$set": {"otp": otp, "expire_at": datetime.now() + timedelta(minutes=5)}}, upsert=True)
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ YOUR SECURITY OTP: {otp}"})
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ RESET OTP: {otp}"})
             session['reset_id'] = tg_id
             return redirect(url_for('verify_otp'))
     return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center;"><button style="width:100%; padding:15px; background:#3b82f6; color:white; border:none; border-radius:15px; font-weight:bold;">GET OTP</button></form></body>')
@@ -464,7 +577,7 @@ def verify_otp():
         if data and data['otp'] == otp and data['expire_at'] > datetime.now():
             session['otp_verified'] = True
             return redirect(url_for('reset_password'))
-    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Verify</h2><input type="text" name="otp" placeholder="ENTER OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:24px; font-weight:bold; letter-spacing:5px;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold;">VERIFY</button></form></body>')
+    return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px; text-align:center;"><h2 style="font-weight:900;">Verify</h2><input type="text" name="otp" placeholder="OTP" required style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0; text-align:center; font-size:24px; font-weight:bold;"><button style="width:100%; padding:15px; background:#10b981; color:white; border:none; border-radius:15px; font-weight:bold;">VERIFY</button></form></body>')
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
@@ -473,8 +586,8 @@ def reset_password():
         pw = request.form.get('password')
         settings_col.update_one({}, {"$set": {"admin_password": generate_password_hash(pw)}})
         session.clear()
-        return 'SUCCESS! <a href="/login">LOGIN NOW</a>'
+        return 'SUCCESS! <a href="/login">LOGIN</a>'
     return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center; font-weight:900;">NEW PASSKEY</h2><input type="password" name="password" required placeholder="New Password" style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0;"><button style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:15px; font-weight:bold;">UPDATE</button></form></body>')
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
