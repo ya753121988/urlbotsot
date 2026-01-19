@@ -24,7 +24,7 @@ ad_links_col = db['ad_links']
 stats_col = db['stats']
 
 # --- টেলিগ্রাম সেটিংস ---
-TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
+TELEGRAM_BOT_TOKEN = "8552256920:AAF6iyUJjJNsCUBVHm_XrxCxtlbnJtqnF2U"
 
 COLOR_MAP = {
     "red": {"text": "text-red-500", "bg": "bg-red-600", "border": "border-red-500", "hover": "hover:bg-red-700", "light_bg": "bg-red-50"},
