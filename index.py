@@ -166,6 +166,8 @@ def admin_panel():
                 <button onclick="tab('partners')" id="btn-partners" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">📢 Partners</button>
                 <!-- ৫. Settings: সাইটের নাম, পাসওয়ার্ড, থিম, টাইম এবং অ্যাড কোড সেট করার জায়গা -->
                 <button onclick="tab('config')" id="btn-config" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">⚙️ Settings</button>
+                <!-- ৬. Logout: এখান থেকে এডমিন প্যানেল থেকে বের হওয়া যায় -->
+                <a href="/logout" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-4 lg:mt-10 border border-red-100 lg:border-none">🚪 Logout</a>
             </nav>
         </div>
 
