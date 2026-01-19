@@ -2,6 +2,7 @@ import os
 import random
 import string
 import requests
+import json
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify, session
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -80,20 +81,15 @@ def api_system():
     settings = get_settings()
     raw_token = request.args.get('api') or request.args.get('api_key') or request.args.get('key')
     api_token = raw_token.strip() if raw_token else None
-    
     long_url = request.args.get('url')
     alias = request.args.get('alias')
     res_format = request.args.get('format', 'json').lower()
     ad_type = request.args.get('type', '1')
-
     stored_token = settings['api_key'].strip()
-
     if not api_token or api_token != stored_token:
         return jsonify({"status": "error", "message": "Invalid API Token"}) if res_format != 'text' else "Error: Invalid Token"
-    
     if not long_url:
         return jsonify({"status": "error", "message": "Missing URL"}) if res_format != 'text' else "Error: Missing URL"
-
     short_code = alias if alias else ''.join(random.choices(string.ascii_letters + string.digits, k=6))
     urls_col.insert_one({"long_url": long_url, "short_code": short_code, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": ad_type})
     shortened_url = request.host_url + short_code
@@ -124,7 +120,7 @@ def admin_panel():
     all_urls = list(urls_col.find().sort("_id", -1))
     total_clicks = sum(u.get('clicks', 0) for u in all_urls)
     channels = list(channels_col.find())
-    ad_links = list(ad_links_col.find()) # আনলিমিটেড এড লিঙ্কের লিস্ট
+    ad_links = list(ad_links_col.find()) # আনলিমিটেড এড লিঙ্কের তালিকা
     theme_options = sorted(COLOR_MAP.keys())
 
     return render_template_string(f'''
@@ -179,13 +175,13 @@ def admin_panel():
                         <h4 class="font-black text-xl text-slate-900">🎨 UI & Design System</h4>
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="text-xs font-bold text-slate-400 mb-2 block">HOME PAGE THEME</label>
+                                <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">Home Page Theme</label>
                                 <select name="main_theme" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold text-slate-700">
                                     {"".join([f'<option value="{o}" {"selected" if settings.get("main_theme")==o else ""}>{o.upper()}</option>' for o in theme_options])}
                                 </select>
                             </div>
                             <div>
-                                <label class="text-xs font-bold text-slate-400 mb-2 block">STEP PAGE THEME</label>
+                                <label class="text-xs font-bold text-slate-400 mb-2 block uppercase">Step Page Theme</label>
                                 <select name="step_theme" class="w-full p-4 bg-slate-50 rounded-2xl border-none font-bold text-slate-700">
                                     {"".join([f'<option value="{o}" {"selected" if settings.get("step_theme")==o else ""}>{o.upper()}</option>' for o in theme_options])}
                                 </select>
@@ -366,9 +362,10 @@ def handle_ad_steps(short_code):
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
         return redirect(url_data['long_url'])
     
-    # --- র‍্যান্ডম এড লিঙ্ক লজিক ---
-    all_ads = list(ad_links_col.find())
-    selected_ad_url = random.choice(all_ads)['url'] if all_ads else "https://google.com"
+    # --- প্রতি রিলোডে র‍্যান্ডম এড লিঙ্ক সিলেক্ট করা ---
+    all_ads = [l['url'] for l in ad_links_col.find()]
+    # জাভাস্ক্রিপ্ট পুলে পাঠানোর জন্য JSON এ রূপান্তর
+    ads_json = json.dumps(all_ads)
     
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
     return render_template_string(f'''
@@ -392,7 +389,7 @@ def handle_ad_steps(short_code):
             let timeLeft = {settings['timer_seconds']};
             let totalAdClicks = 0;
             let adLimit = {settings.get('direct_click_limit', 1)};
-            let adUrl = "{selected_ad_url}";
+            let adPool = {ads_json}; // ডাটাবেস থেকে আসা সমস্ত লিঙ্কের তালিকা
             
             const timerBox = document.getElementById('timer_box');
             const mainBtn = document.getElementById('main_btn');
@@ -409,7 +406,7 @@ def handle_ad_steps(short_code):
             }}, 1000);
 
             function refreshBtnText() {{
-                if (totalAdClicks < adLimit && adUrl !== "") {{
+                if (totalAdClicks < adLimit) {{
                     mainBtn.innerText = "VERIFY (" + (totalAdClicks + 1) + "/" + adLimit + ")";
                 }} else {{
                     mainBtn.innerText = "CONTINUE TO NEXT";
@@ -417,8 +414,10 @@ def handle_ad_steps(short_code):
             }}
 
             function handleClick() {{
-                if (totalAdClicks < adLimit && adUrl !== "") {{
-                    window.open(adUrl, '_blank');
+                if (totalAdClicks < adLimit) {{
+                    // পুল থেকে র‍্যান্ডম একটি লিঙ্ক নেওয়া (এটি প্রতি ক্লিকে র‍্যান্ডম হবে)
+                    let randomUrl = adPool.length > 0 ? adPool[Math.floor(Math.random() * adPool.length)] : "https://google.com";
+                    window.open(randomUrl, '_blank');
                     totalAdClicks++;
                     refreshBtnText();
                 }} else {{
