@@ -82,7 +82,7 @@ def get_channels_html(theme_color="sky"):
         html += f'<a href="{ch["link"]}" target="_blank" class="flex flex-col items-center gap-3 group transition hover:scale-105"><div><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider">{ch.get("name", "Join Channel")}</p></div><img src="{ch["logo"]}" class="w-full max-w-[320px] h-[180px] object-cover border-2 border-white/10 rounded-lg shadow-2xl"></a>'
     return html + '</div></div>'
 
-# --- API ---
+# --- API সিস্টেম ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
@@ -96,15 +96,14 @@ def api_system():
         return jsonify({"status": "error", "message": "Missing URL"}) if res_format != 'text' else "Error: Missing URL"
     sc = alias if alias else ''.join(random.choices(string.ascii_letters + string.digits, k=6))
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
-    short_url = request.host_url + sc
-    return short_url if res_format == 'text' else jsonify({"status": "success", "shortenedUrl": short_url})
+    return request.host_url + sc if res_format == 'text' else jsonify({"status": "success", "shortenedUrl": request.host_url + sc})
 
-# --- USER INTERFACE ---
+# --- হোম পেজ ---
 @app.route('/')
 def index():
     settings = get_settings()
     c = COLOR_MAP.get(settings.get('main_theme', 'sky'), COLOR_MAP['sky'])
-    return render_template_string(f'''<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{settings['site_name']}</title><style>body {{ background: #0f172a; color: white; }} .glass {{ background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }}</style></head><body class="min-h-screen flex flex-col items-center justify-center p-6 text-center"><h1 class="text-5xl md:text-9xl font-black mb-6 {c['text']} italic uppercase">{settings['site_name']}</h1><p class="text-gray-200 mb-14 text-xl md:text-4xl font-black uppercase tracking-widest">Fast • Secure • Premium</p><div class="glass p-5 rounded-[50px] w-full max-w-4xl shadow-3xl"><form action="/shorten" method="POST" class="flex flex-col md:flex-row gap-4"><input type="url" name="long_url" placeholder="PASTE LINK HERE..." required class="flex-1 bg-transparent p-6 outline-none text-white text-2xl font-black"><button type="submit" class="{c['bg']} text-white px-14 py-6 rounded-[40px] font-black text-3xl hover:scale-105 transition uppercase">Shorten</button></form></div>{get_channels_html(settings.get('main_theme', 'sky'))}</body></html>''')
+    return render_template_string(f'''<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{settings['site_name']}</title><style>body {{ background: #0f172a; color: white; }} .glass {{ background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }}</style></head><body class="min-h-screen flex flex-col items-center justify-center p-6 text-center"><h1 class="text-5xl md:text-9xl font-black mb-6 {c['text']} italic uppercase">{settings['site_name']}</h1><p class="text-gray-200 mb-14 text-xl md:text-4xl font-black uppercase tracking-widest">Premium Shortener System</p><div class="glass p-5 rounded-[50px] w-full max-w-4xl shadow-3xl"><form action="/shorten" method="POST" class="flex flex-col md:flex-row gap-4"><input type="url" name="long_url" placeholder="PASTE LINK HERE..." required class="flex-1 bg-transparent p-6 outline-none text-white text-2xl font-black"><button type="submit" class="{c['bg']} text-white px-14 py-6 rounded-[40px] font-black text-3xl hover:scale-105 transition uppercase">Shorten</button></form></div>{get_channels_html(settings.get('main_theme', 'sky'))}</body></html>''')
 
 @app.route('/shorten', methods=['POST'])
 def web_shorten():
@@ -113,10 +112,9 @@ def web_shorten():
     long_url = request.form.get('long_url')
     sc = ''.join(random.choices(string.ascii_letters + string.digits, k=6))
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
-    short_url = request.host_url + sc
-    return render_template_string(f'''<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{short_url}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-bold uppercase text-sm">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
+    return render_template_string(f'''<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-bold uppercase text-sm">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- ADMIN PANEL ---
+# --- এডমিন প্যানেল (Dashboard + Analytics + Settings) ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -125,6 +123,7 @@ def admin_panel():
     channels = list(channels_col.find())
     ad_links = list(ad_links_col.find())
     
+    # স্ট্যাটস প্রোসেসিং
     today = datetime.now().strftime("%Y-%m-%d")
     total_views = stats_col.count_documents({})
     today_views = stats_col.count_documents({"date": today})
@@ -139,11 +138,13 @@ def admin_panel():
     return render_template_string('''
     <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Premium Admin</title>
     <script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style> .tab-content { display: none; } .tab-content.active { display: block; } .active-btn { background: #1e293b !important; color: white !important; } </style>
-    </head><body class="bg-slate-50 flex flex-col lg:flex-row min-h-screen">
+    <style> .tab-content { display: none; } .tab-content.active { display: block; } .active-btn { background: #1e293b !important; color: white !important; } 
+    ::-webkit-scrollbar { height: 5px; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } </style>
+    </head><body class="bg-slate-50 flex flex-col lg:flex-row min-h-screen font-sans">
+        <!-- Sidebar Navigation -->
         <div class="w-full lg:w-72 bg-white border-b lg:border-r p-6 flex lg:flex-col overflow-x-auto lg:overflow-visible sticky top-0 z-50">
-            <h2 class="hidden lg:block text-2xl font-black mb-10 text-blue-600 italic">PREMIUM ADMIN</h2>
-            <nav class="flex lg:flex-col gap-2 w-full lg:w-auto">
+            <h2 class="hidden lg:block text-2xl font-black mb-10 text-blue-600 italic tracking-tighter">PREMIUM ADMIN</h2>
+            <nav class="flex lg:flex-col gap-2 w-full">
                 <button onclick="tab('dash')" id="btn-dash" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold active-btn">📊 Dashboard</button>
                 <button onclick="tab('links')" id="btn-links" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🔗 Links</button>
                 <button onclick="tab('ads')" id="btn-ads" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">💰 Ads</button>
@@ -151,58 +152,68 @@ def admin_panel():
                 <button onclick="tab('config')" id="btn-config" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">⚙️ Settings</button>
             </nav>
         </div>
+
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
+            <!-- TAB: DASHBOARD -->
             <div id="dash" class="tab-content active space-y-8">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-blue-600 p-8 rounded-[40px] text-white shadow-xl"><p class="text-xs font-bold opacity-70">TOTAL VIEWS</p><h3 class="text-5xl font-black">{{total_views}}</h3></div>
-                    <div class="bg-emerald-500 p-8 rounded-[40px] text-white shadow-xl"><p class="text-xs font-bold opacity-70">TODAY</p><h3 class="text-5xl font-black">{{today_views}}</h3></div>
-                    <div class="bg-white p-8 rounded-[40px] border shadow-sm"><p class="text-xs font-bold text-slate-400">LINKS</p><h3 class="text-5xl font-black text-slate-800">{{all_urls|length}}</h3></div>
+                    <div class="bg-emerald-500 p-8 rounded-[40px] text-white shadow-xl"><p class="text-xs font-bold opacity-70">TODAY'S VIEWS</p><h3 class="text-5xl font-black">{{today_views}}</h3></div>
+                    <div class="bg-white p-8 rounded-[40px] border shadow-sm"><p class="text-xs font-bold text-slate-400">TOTAL LINKS</p><h3 class="text-5xl font-black text-slate-800">{{all_urls|length}}</h3></div>
                 </div>
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                    <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-6">Traffic Trend</h4><canvas id="trafficChart"></canvas></div>
-                    <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-6">Countries & Devices</h4>
+                    <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-6 uppercase text-slate-400 text-sm">Traffic Trend</h4><canvas id="trafficChart"></canvas></div>
+                    <div class="bg-white p-8 rounded-[40px] border shadow-sm">
+                        <h4 class="font-black mb-6 uppercase text-slate-400 text-sm">Devices & Countries</h4>
                         <div class="grid grid-cols-2 gap-4">
-                            <div><p class="text-xs font-bold text-blue-600">DEVICES</p>{% for d in devices %}<div class="bg-slate-50 p-2 rounded-lg text-xs mt-1 flex justify-between"><span>{{d._id}}</span><b>{{d.count}}</b></div>{% endfor %}</div>
-                            <div><p class="text-xs font-bold text-orange-600">COUNTRIES</p>{% for c in countries %}<div class="bg-slate-50 p-2 rounded-lg text-xs mt-1 flex justify-between"><span>{{c._id}}</span><b>{{c.count}}</b></div>{% endfor %}</div>
+                            <div><p class="text-xs font-bold text-blue-600 mb-2">DEVICES</p>{% for d in devices %}<div class="bg-slate-50 p-2 rounded-lg text-xs mb-1 flex justify-between"><span>{{d._id}}</span><b>{{d.count}}</b></div>{% endfor %}</div>
+                            <div><p class="text-xs font-bold text-orange-600 mb-2">COUNTRIES</p>{% for c in countries %}<div class="bg-slate-50 p-2 rounded-lg text-xs mb-1 flex justify-between"><span>{{c._id}}</span><b>{{c.count}}</b></div>{% endfor %}</div>
                         </div>
                     </div>
                 </div>
-                <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-4">Ad Performance</h4>
-                    {% for as in ad_stats %}<div class="flex justify-between p-4 bg-slate-50 rounded-2xl mb-2 text-sm"><span class="truncate pr-4">{{as.url}}</span><b class="text-emerald-600">{{as.count}} clicks</b></div>{% endfor %}
+                <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-4 uppercase text-slate-400 text-sm">Direct Ad Link Performance</h4>
+                    <div class="space-y-2">{% for as in ad_stats %}<div class="flex justify-between p-4 bg-slate-50 rounded-2xl text-sm"><span class="truncate pr-4">{{as.url}}</span><b class="text-emerald-600">{{as.count}} Clicks</b></div>{% endfor %}</div>
                 </div>
             </div>
 
+            <!-- TAB: LINKS -->
             <div id="links" class="tab-content">
                 <div class="bg-white rounded-[40px] border shadow-sm overflow-x-auto">
-                    <table class="w-full text-left"><thead class="bg-slate-50 text-xs font-bold uppercase"><tr><th class="p-6">Link</th><th class="p-6">Original</th><th class="p-6">Clicks</th></tr></thead>
-                    <tbody class="divide-y font-bold">{% for u in all_urls %}<tr><td class="p-6 text-blue-600">/{{u.short_code}}</td><td class="p-6 truncate max-w-xs">{{u.long_url}}</td><td class="p-6">{{u.clicks}}</td></tr>{% endfor %}</tbody></table>
+                    <table class="w-full text-left text-sm"><thead class="bg-slate-50 font-bold uppercase text-slate-400"><tr><th class="p-6">Link</th><th class="p-6">Original URL</th><th class="p-6">Clicks</th></tr></thead>
+                    <tbody class="divide-y font-bold">{% for u in all_urls %}<tr><td class="p-6 text-blue-600">/{{u.short_code}}</td><td class="p-6 truncate max-w-xs text-slate-500">{{u.long_url}}</td><td class="p-6">{{u.clicks}}</td></tr>{% endfor %}</tbody></table>
                 </div>
             </div>
 
-            <div id="ads" class="tab-content space-y-6">
-                <form action="/admin/add_ad_link" method="POST" class="bg-white p-10 rounded-[40px] border shadow-sm">
-                    <h4 class="font-black mb-4">Add Ad Link</h4>
-                    <div class="flex gap-4"><input type="url" name="ad_url" placeholder="Direct Ad Link" required class="flex-1 p-4 bg-slate-50 rounded-2xl"><button class="bg-blue-600 text-white px-8 rounded-2xl font-bold">ADD</button></div>
-                </form>
-                <div class="space-y-2">{% for l in ad_links %}<div class="bg-white p-5 rounded-3xl flex justify-between items-center shadow-sm border"><span>{{l.url}}</span><a href="/admin/delete_ad_link/{{l._id}}" class="text-red-500 font-bold">Delete</a></div>{% endfor %}</div>
+            <!-- TAB: ADS -->
+            <div id="ads" class="tab-content space-y-8">
+                <div class="bg-white p-10 rounded-[50px] border shadow-sm">
+                    <h4 class="font-black mb-6">Manage Direct Ad Links</h4>
+                    <form action="/admin/add_ad_link" method="POST" class="flex flex-col md:flex-row gap-4 mb-8">
+                        <input type="url" name="ad_url" placeholder="Paste Direct Link URL..." required class="flex-1 p-4 bg-slate-50 rounded-2xl">
+                        <button class="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black">ADD LINK</button>
+                    </form>
+                    <div class="space-y-3">{% for l in ad_links %}<div class="bg-slate-50 p-5 rounded-3xl flex justify-between items-center"><span>{{l.url}}</span><a href="/admin/delete_ad_link/{{l._id}}" class="text-red-500 font-bold">DELETE</a></div>{% endfor %}</div>
+                </div>
             </div>
 
+            <!-- TAB: PARTNERS -->
             <div id="partners" class="tab-content">
-                <div class="bg-white p-10 rounded-[40px] border shadow-sm">
-                    <h4 class="font-black mb-6">Partner Channels</h4>
-                    <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-10 rounded-[50px] border shadow-sm">
+                    <h4 class="font-black mb-6">Official Channels</h4>
+                    <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
                         <input type="text" name="name" placeholder="Name" required class="p-4 bg-slate-50 rounded-xl">
                         <input type="url" name="logo" placeholder="Logo URL" required class="p-4 bg-slate-50 rounded-xl">
-                        <input type="url" name="link" placeholder="Link" required class="p-4 bg-slate-50 rounded-xl">
-                        <button class="bg-blue-600 text-white rounded-xl font-bold">ADD</button>
+                        <input type="url" name="link" placeholder="Invite Link" required class="p-4 bg-slate-50 rounded-xl">
+                        <button class="bg-emerald-600 text-white rounded-xl font-bold">ADD CHANNEL</button>
                     </form>
-                    {% for ch in channels %}<div class="flex items-center gap-6 p-4 border-b"><img src="{{ch.logo}}" class="w-20 h-12 object-cover rounded"><b>{{ch.name}}</b><a href="/admin/delete_channel/{{ch._id}}" class="ml-auto text-red-500 font-bold">Del</a></div>{% endfor %}
+                    <div class="grid gap-6">{% for ch in channels %}<div class="flex items-center gap-6 p-4 border-b"><img src="{{ch.logo}}" class="w-20 h-12 object-cover rounded shadow"><b>{{ch.name}}</b><a href="/admin/delete_channel/{{ch._id}}" class="ml-auto text-red-500 font-bold">DEL</a></div>{% endfor %}</div>
                 </div>
             </div>
 
+            <!-- TAB: SETTINGS -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-4">
+                    <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-6">
                         <h4 class="font-black text-xl">General Settings</h4>
                         <input type="text" name="site_name" value="{{s.site_name}}" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <div class="grid grid-cols-2 gap-4">
@@ -212,24 +223,24 @@ def admin_panel():
                             <select name="step_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.step_theme == k %}selected{% endif %}>STEP: {{k|upper}}</option>{% endfor %}</select>
                         </div>
                         <div class="bg-orange-50 p-6 rounded-3xl space-y-4">
-                            <p class="text-xs font-bold text-orange-600">API KEY MANAGEMENT</p>
-                            <input type="text" id="apiKey" name="api_key" value="{{s.api_key}}" class="w-full p-4 bg-white rounded-xl text-xs font-mono border">
+                            <p class="text-xs font-bold text-orange-600 uppercase">API Management</p>
+                            <input type="text" id="apiKey" name="api_key" value="{{s.api_key}}" class="w-full p-4 bg-white rounded-xl text-xs font-mono border outline-none">
                             <div class="flex gap-2">
-                                <button type="button" onclick="copyApi()" class="flex-1 bg-white text-orange-600 py-3 rounded-lg text-xs font-bold border">COPY</button>
-                                <button type="button" onclick="genApi()" class="flex-1 bg-orange-600 text-white py-3 rounded-lg text-xs font-bold">GENERATE</button>
+                                <button type="button" onclick="copyApi()" class="flex-1 bg-white text-orange-600 py-3 rounded-lg text-xs font-bold border">COPY KEY</button>
+                                <button type="button" onclick="genApi()" class="flex-1 bg-orange-600 text-white py-3 rounded-lg text-xs font-bold">REGENERATE</button>
                             </div>
                         </div>
-                        <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram Admin ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
-                        <input type="password" name="new_password" placeholder="New Password" class="w-full p-4 bg-red-50 rounded-2xl font-bold">
+                        <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
+                        <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full p-4 bg-red-50 rounded-2xl font-bold">
                     </div>
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-4">
                         <h4 class="font-black text-xl text-emerald-600">Monetization Scripts</h4>
-                        <input type="number" name="direct_click_limit" value="{{s.direct_click_limit}}" class="w-full p-4 bg-blue-50 rounded-2xl font-bold">
+                        <input type="number" name="direct_click_limit" value="{{s.direct_click_limit}}" class="w-full p-4 bg-blue-50 rounded-2xl font-bold" placeholder="Clicks per direct ad">
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.popunder}}</textarea>
                         <textarea name="banner" placeholder="Banner Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.banner}}</textarea>
                         <textarea name="social_bar" placeholder="Social Bar" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
                         <textarea name="native" placeholder="Native Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.native}}</textarea>
-                        <button class="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-xl shadow-xl">SAVE CHANGES</button>
+                        <button class="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-xl shadow-xl">SAVE ALL CHANGES</button>
                     </div>
                 </form>
             </div>
@@ -252,15 +263,16 @@ def admin_panel():
             }
             new Chart(document.getElementById('trafficChart'), {
                 type: 'line',
-                data: { labels: {{chart_labels|tojson}}, datasets: [{ label: 'Views', data: {{chart_values|tojson}}, borderColor: '#2563eb', fill: true, backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.4 }] },
+                data: { labels: {{chart_labels|tojson}}, datasets: [{ label: 'Views', data: {{chart_values|tojson}}, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4, borderWidth: 4 }] },
                 options: { responsive: true, plugins: { legend: { display: false } } }
             });
         </script>
     </body></html>
     ''', total_views=total_views, today_views=today_views, all_urls=all_urls, countries=countries, 
-        devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, s=settings,
+        devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, s=settings, 
         colors=COLOR_MAP.keys(), chart_labels=chart_labels, chart_values=chart_values)
 
+# --- এডমিন অ্যাকশনস রুট ---
 @app.route('/admin/add_ad_link', methods=['POST'])
 def add_ad_link():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -309,7 +321,7 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- REDIRECT STEP ---
+# --- রিডাইরেক্ট লজিক ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -327,8 +339,8 @@ def handle_ad_steps(short_code):
     {{ s.popunder|safe }} {{ s.social_bar|safe }}</head><body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
         <div class="mb-6">{{ s.banner|safe }}</div>
         <div class="bg-white p-12 md:p-20 rounded-[50px] md:rounded-[70px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
-            <p class="text-xl md:text-2xl font-black {{tc.text}} uppercase mb-4">Step {{step}} of {{total_steps}}</p>
-            <div id="timer_box" class="text-7xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
+            <p class="text-xl md:text-2xl font-black {{tc.text}} uppercase tracking-widest mb-4">Step {{step}} of {{total_steps}}</p>
+            <div id="timer_box" class="text-7xl md:text-8xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 md:w-48 md:h-48 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
             <button id="main_btn" onclick="handleClick()" class="hidden w-full {{tc.bg}} text-white py-8 rounded-[40px] font-black text-3xl uppercase">Continue</button>
         </div>
         <div class="mt-4">{{ s.native|safe }}</div>{{ partners_html|safe }}
@@ -352,13 +364,13 @@ def track_ajax():
     track_click(request.args.get('sc'), request.args.get('ad'))
     return "ok"
 
-# --- LOGIN & RECOVERY ---
+# --- লগইন ও পাসওয়ার্ড রিকভারি ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         if check_password_hash(get_settings()['admin_password'], request.form.get('password')):
             session['logged_in'] = True; return redirect(url_for('admin_panel'))
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;padding:20px;"><form method="POST" style="background:white;padding:50px;border-radius:40px;text-align:center;max-width:350px;width:100%;"><h2 style="font-weight:900;margin-bottom:30px;">ADMIN LOGIN</h2><input type="password" name="password" placeholder="Key" style="width:100%;padding:15px;border-radius:15px;border:1px solid #eee;margin-bottom:15px;text-align:center;font-weight:bold;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:15px;font-weight:900;">UNLOCK</button><a href="/forgot-password" style="display:block;margin-top:20px;font-size:12px;color:#3b82f6;text-decoration:none;font-weight:bold;">Forgot Passkey?</a></form></body>')
+    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;padding:20px;"><form method="POST" style="background:white;padding:40px;border-radius:30px;text-align:center;width:100%;max-width:350px;"><h2 style="font-weight:900;margin-bottom:30px;">ADMIN LOGIN</h2><input type="password" name="password" placeholder="Key" style="width:100%;padding:15px;margin-bottom:15px;border:1px solid #ddd;border-radius:10px;text-align:center;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:10px;font-weight:900;">LOGIN</button><a href="/forgot-password" style="display:block;margin-top:20px;font-size:12px;color:#3b82f6;text-decoration:none;">Forgot Passkey?</a></form></body>')
 
 @app.route('/logout')
 def logout(): session.clear(); return redirect(url_for('login'))
@@ -371,9 +383,9 @@ def forgot_password():
         if tg_id == settings.get('admin_telegram_id'):
             otp = str(random.randint(100000, 999999))
             otp_col.update_one({"id": "admin_reset"}, {"$set": {"otp": otp, "expire_at": datetime.now() + timedelta(minutes=5)}}, upsert=True)
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ RESET OTP: {otp}"})
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ OTP: {otp}"})
             session['reset_id'] = tg_id; return redirect(url_for('verify_otp'))
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2>Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram ID" required style="width:100%;padding:15px;margin:20px 0;text-align:center;"><button style="width:100%;padding:15px;background:#3b82f6;color:white;border:none;border-radius:15px;font-weight:bold;">GET OTP</button></form></body>')
+    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2>Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%;padding:15px;margin:20px 0;text-align:center;"><button style="width:100%;padding:15px;background:#3b82f6;color:white;border:none;border-radius:15px;">GET OTP</button></form></body>')
 
 @app.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
@@ -382,7 +394,7 @@ def verify_otp():
         otp = request.form.get('otp'); data = otp_col.find_one({"id": "admin_reset"})
         if data and data['otp'] == otp and data['expire_at'] > datetime.now():
             session['otp_verified'] = True; return redirect(url_for('reset_password'))
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2>Verify OTP</h2><input type="text" name="otp" placeholder="OTP" required style="width:100%;padding:15px;margin:20px 0;text-align:center;font-size:24px;font-weight:bold;"><button style="width:100%;padding:15px;background:#10b981;color:white;border:none;border-radius:15px;font-weight:bold;">VERIFY</button></form></body>')
+    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2>Verify OTP</h2><input type="text" name="otp" placeholder="ENTER OTP" required style="width:100%;padding:15px;margin:20px 0;text-align:center;font-size:24px;"><button style="width:100%;padding:15px;background:#10b981;color:white;border:none;border-radius:15px;">VERIFY</button></form></body>')
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
@@ -391,7 +403,7 @@ def reset_password():
         pw = request.form.get('password')
         settings_col.update_one({}, {"$set": {"admin_password": generate_password_hash(pw)}})
         session.clear(); return 'SUCCESS! <a href="/login">LOGIN NOW</a>'
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;"><h2 style="text-align:center;">NEW PASSWORD</h2><input type="password" name="password" required placeholder="New Password" style="width:100%;padding:15px;margin:20px 0;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:15px;font-weight:bold;">UPDATE</button></form></body>')
+    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;"><h2 style="text-align:center;">NEW PASSWORD</h2><input type="password" name="password" required placeholder="New Password" style="width:100%;padding:15px;margin:20px 0;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:15px;">UPDATE</button></form></body>')
 
 if __name__ == '__main__':
     app.run(debug=True)
