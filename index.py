@@ -1,6 +1,7 @@
 import os
 import random
 import string
+import json
 import requests
 from flask import Flask, render_template_string, request, redirect, url_for, jsonify, session
 from pymongo import MongoClient
@@ -9,21 +10,26 @@ from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 
 app = Flask(__name__)
+
+# --- কনফিগারেশন (Render Environment Variables থেকে নেবে) ---
+# যদি Render এ সেট না থাকে তবে ডিফল্ট ভ্যালু ব্যবহার করবে
 app.secret_key = os.environ.get("SECRET_KEY", "premium-super-secret-key-2025")
+MONGO_URI = os.environ.get("MONGO_URI") # Render এর Environment Variable এ অবশ্যই MONGO_URI দিতে হবে
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34")
 
 # --- ডাটাবেস কানেকশন ---
-MONGO_URI = os.environ.get("MONGO_URI")
+if not MONGO_URI:
+    print("Warning: MONGO_URI is not set! App may crash.")
+    
 client = MongoClient(MONGO_URI, tlsAllowInvalidCertificates=True, serverSelectionTimeoutMS=5000)
 db = client['premium_url_bot']
 urls_col = db['urls']
 settings_col = db['settings']
 channels_col = db['channels']
 otp_col = db['otps']
+direct_links_col = db['direct_links']
 
-# --- টেলিগ্রাম সেটিংস ---
-TELEGRAM_BOT_TOKEN = "8469682967:AAEWrNWBWjiYT3_L47Xe_byORfD6IIsFD34"
-
-# --- থিম কালার ম্যাপ (Design Options) ---
+# --- থিম কালার ম্যাপ ---
 COLOR_MAP = {
     "red": {"text": "text-red-500", "bg": "bg-red-600", "border": "border-red-500", "hover": "hover:bg-red-700", "light_bg": "bg-red-50"},
     "orange": {"text": "text-orange-500", "bg": "bg-orange-600", "border": "border-orange-500", "hover": "hover:bg-orange-700", "light_bg": "bg-orange-50"},
@@ -47,7 +53,6 @@ def get_settings():
             "admin_password": generate_password_hash("admin123"),
             "api_key": ''.join(random.choices(string.ascii_lowercase + string.digits, k=40)),
             "popunder": "", "banner": "", "social_bar": "", "native": "",
-            "direct_link": "https://google.com", 
             "direct_click_limit": 1,
             "main_theme": "sky", "step_theme": "blue"
         }
@@ -58,7 +63,7 @@ def get_settings():
 def is_logged_in():
     return session.get('logged_in')
 
-# --- চ্যানেল বক্স জেনারেটর (320x180 ব্যানার স্টাইল) ---
+# --- চ্যানেল বক্স ---
 def get_channels_html(theme_color="sky"):
     channels = list(channels_col.find())
     if not channels: return ""
@@ -73,7 +78,7 @@ def get_channels_html(theme_color="sky"):
         </a>'''
     return html + '</div></div>'
 
-# --- API সিস্টেম ---
+# --- API ---
 @app.route('/api')
 def api_system():
     settings = get_settings()
@@ -115,7 +120,7 @@ def web_shorten():
     urls_col.insert_one({"long_url": long_url, "short_code": sc, "clicks": 0, "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "1"})
     return render_template_string(f'''<html><head><script src="https://cdn.tailwindcss.com"></script></head><body class="bg-slate-900 flex flex-col items-center justify-center min-h-screen p-4 text-white"><div class="bg-slate-800 p-16 rounded-[60px] shadow-2xl text-center max-w-2xl w-full border border-slate-700"><h2 class="text-5xl font-black mb-10 {c['text']} uppercase italic">Link Created!</h2><input id="shortUrl" value="{request.host_url + sc}" readonly class="w-full bg-slate-900 p-8 rounded-3xl border border-slate-700 {c['text']} font-black text-center mb-10 text-3xl"><button onclick="copyLink()" id="copyBtn" class="w-full {c['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase tracking-tighter transition shadow-2xl">COPY LINK</button><a href="/" class="block mt-10 text-slate-500 font-black uppercase text-sm hover:text-white transition">Shorten Another</a></div><script>function copyLink() {{ var copyText = document.getElementById("shortUrl"); copyText.select(); navigator.clipboard.writeText(copyText.value); document.getElementById("copyBtn").innerText = "COPIED!"; }}</script></body></html>''')
 
-# --- প্রিমিয়াম এডমিন ড্যাশবোর্ড (Tab Design) ---
+# --- এডমিন প্যানেল ---
 @app.route('/admin')
 def admin_panel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -123,6 +128,10 @@ def admin_panel():
     all_urls = list(urls_col.find().sort("_id", -1))
     total_clicks = sum(u.get('clicks', 0) for u in all_urls)
     channels = list(channels_col.find())
+    
+    # ডাইরেক্ট লিংক লোড করা
+    direct_links = list(direct_links_col.find())
+    
     theme_options = sorted(COLOR_MAP.keys())
 
     return render_template_string(f'''
@@ -131,7 +140,7 @@ def admin_panel():
     <style> body {{ font-family: 'Plus Jakarta Sans', sans-serif; background: #f8fafc; }} .active-tab {{ background: #1e293b !important; color: white !important; }} .tab-content {{ display: none; }} .tab-content.active {{ display: block; }} </style>
     </head>
     <body class="flex flex-col lg:flex-row min-h-screen">
-        <!-- Sidebar Navigation -->
+        <!-- Sidebar -->
         <div class="lg:w-72 bg-white border-r p-8 flex flex-col shadow-sm">
             <h2 class="text-2xl font-black text-slate-900 mb-12 italic tracking-tighter">PREMIUM <span class="text-blue-600">ADMIN</span></h2>
             <nav class="space-y-3 flex-1">
@@ -142,10 +151,9 @@ def admin_panel():
             <a href="/logout" class="mt-10 p-4 bg-red-50 text-red-600 rounded-2xl text-center font-black uppercase text-xs tracking-widest hover:bg-red-100 transition">Logout Account</a>
         </div>
 
-        <!-- Content Area -->
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
             
-            <!-- TAB 1: OVERVIEW -->
+            <!-- OVERVIEW -->
             <div id="overview" class="tab-content active space-y-10">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-8 rounded-[40px] shadow-sm border border-slate-100">
@@ -169,7 +177,7 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB 2: CONFIGURATIONS -->
+            <!-- CONFIG -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 xl:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-6">
@@ -195,7 +203,7 @@ def admin_panel():
                             <input type="number" name="timer_seconds" value="{settings['timer_seconds']}" class="w-full p-4 bg-slate-50 rounded-2xl border-none" placeholder="Timer Seconds">
                         </div>
 
-                        <!-- API Key Management -->
+                        <!-- API Key -->
                         <h4 class="font-black text-xl text-slate-900 pt-4">🔑 API Management</h4>
                         <div class="bg-orange-50 p-6 rounded-[30px] border border-orange-100 space-y-4">
                             <label class="text-xs font-bold text-orange-600 block uppercase">API Shortener Token</label>
@@ -212,20 +220,44 @@ def admin_panel():
 
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-4">
                         <h4 class="font-black text-xl text-emerald-600">💰 Monetization (Scripts)</h4>
-                        <div class="grid grid-cols-2 gap-4">
-                            <input type="url" name="direct_link" value="{settings['direct_link']}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Direct Link">
-                            <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Limit">
+                        <div class="mb-4">
+                             <label class="text-xs font-bold text-slate-400 mb-2 block">CLICKS PER SESSION</label>
+                             <input type="number" name="direct_click_limit" value="{settings.get('direct_click_limit', 1)}" class="w-full p-4 bg-blue-50 rounded-2xl border-none font-bold text-blue-600" placeholder="Direct Link Clicks Limit">
                         </div>
+                        
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['popunder']}</textarea>
                         <textarea name="banner" placeholder="Banner Ad Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['banner']}</textarea>
                         <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['social_bar']}</textarea>
                         <textarea name="native" placeholder="Native/Bottom Script" class="w-full h-20 p-4 bg-slate-50 rounded-2xl text-xs font-mono">{settings['native']}</textarea>
+                        
                         <button class="w-full bg-slate-900 text-white p-6 rounded-[30px] font-black text-xl shadow-2xl hover:scale-[1.02] transition mt-4">Save All Changes</button>
                     </div>
                 </form>
+
+                <!-- UNLIMITED DIRECT LINKS MANAGER -->
+                <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100 space-y-6">
+                     <h4 class="font-black text-xl text-purple-600">🔗 Unlimited Direct Links Manager</h4>
+                     <p class="text-sm text-slate-400">Add as many links as you want. They will be shown randomly (rotated) to users.</p>
+                     
+                     <form action="/admin/add_direct_link" method="POST" class="flex gap-4">
+                        <input type="url" name="direct_link_url" placeholder="Paste Direct Link Here (https://...)" required class="flex-1 p-4 bg-purple-50 rounded-2xl border-none font-bold text-slate-700">
+                        <button class="bg-purple-600 text-white px-8 py-4 rounded-2xl font-black uppercase shadow-lg hover:bg-purple-700 transition">ADD LINK</button>
+                     </form>
+
+                     <div class="space-y-3 mt-4">
+                        {"".join([f'''
+                        <div class="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <span class="text-xs font-mono text-slate-600 truncate flex-1 mr-4">{dl['url']}</span>
+                            <a href="/admin/delete_direct_link/{dl['_id']}" class="bg-red-100 text-red-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-red-200 transition">Remove</a>
+                        </div>
+                        ''' for dl in direct_links])}
+                        
+                        { "<p class='text-center text-slate-400 text-sm italic py-4'>No direct links added yet.</p>" if not direct_links else "" }
+                     </div>
+                </div>
             </div>
 
-            <!-- TAB 3: PARTNERS (Updated with Name and 320x180 Banner) -->
+            <!-- PARTNERS -->
             <div id="partners" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] shadow-sm border border-slate-100">
                     <h4 class="font-black text-xl text-slate-900 mb-6">📢 Manage Official Channels</h4>
@@ -276,7 +308,21 @@ def admin_panel():
     </body></html>
     ''')
 
-# --- এডমিন অ্যাকশন ---
+# --- রাউটস ---
+@app.route('/admin/add_direct_link', methods=['POST'])
+def add_direct_link():
+    if not is_logged_in(): return redirect(url_for('login'))
+    url = request.form.get('direct_link_url')
+    if url:
+        direct_links_col.insert_one({"url": url, "created_at": datetime.now()})
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete_direct_link/<id>')
+def delete_direct_link(id):
+    if not is_logged_in(): return redirect(url_for('login'))
+    direct_links_col.delete_one({"_id": ObjectId(id)})
+    return redirect(url_for('admin_panel'))
+
 @app.route('/admin/add_channel', methods=['POST'])
 def add_channel():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -304,7 +350,6 @@ def update_settings():
         "banner": request.form.get('banner'),
         "social_bar": request.form.get('social_bar'),
         "native": request.form.get('native'),
-        "direct_link": request.form.get('direct_link'),
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme'),
@@ -315,12 +360,21 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
     settings = get_settings()
     url_data = urls_col.find_one({"short_code": short_code})
+    
+    # সব ডাইরেক্ট লিংক লোড এবং র‍্যান্ডম রোটেশন লজিক
+    all_links = list(direct_links_col.find())
+    link_list = [l['url'] for l in all_links]
+    
+    if not link_list:
+        link_list = ["https://google.com"]
+        
+    js_link_array = json.dumps(link_list)
+
     if not url_data: return "404 - Link Not Found", 404
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
@@ -348,8 +402,10 @@ def handle_ad_steps(short_code):
             let timeLeft = {settings['timer_seconds']};
             let totalAdClicks = 0;
             let adLimit = {settings.get('direct_click_limit', 1)};
-            let adUrl = "{settings['direct_link']}";
             
+            // Random Direct Links System
+            const directLinks = {js_link_array};
+
             const timerBox = document.getElementById('timer_box');
             const mainBtn = document.getElementById('main_btn');
 
@@ -365,7 +421,7 @@ def handle_ad_steps(short_code):
             }}, 1000);
 
             function refreshBtnText() {{
-                if (totalAdClicks < adLimit && adUrl !== "") {{
+                if (totalAdClicks < adLimit) {{
                     mainBtn.innerText = "VERIFY (" + (totalAdClicks + 1) + "/" + adLimit + ")";
                 }} else {{
                     mainBtn.innerText = "CONTINUE TO NEXT";
@@ -373,8 +429,9 @@ def handle_ad_steps(short_code):
             }}
 
             function handleClick() {{
-                if (totalAdClicks < adLimit && adUrl !== "") {{
-                    window.open(adUrl, '_blank');
+                if (totalAdClicks < adLimit) {{
+                    const randomLink = directLinks[Math.floor(Math.random() * directLinks.length)];
+                    window.open(randomLink, '_blank');
                     totalAdClicks++;
                     refreshBtnText();
                 }} else {{
@@ -384,7 +441,7 @@ def handle_ad_steps(short_code):
         </script>
     </body></html>''')
 
-# --- লগইন ও রিকভারি ---
+# --- লগইন ও পাসওয়ার্ড রিকভারি ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -434,4 +491,6 @@ def reset_password():
     return render_template_string('<body style="background:#0f172a; display:flex; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><form method="POST" style="background:white; padding:40px; border-radius:30px; width:320px;"><h2 style="text-align:center; font-weight:900;">NEW PASSKEY</h2><input type="password" name="password" required placeholder="New Password" style="width:100%; padding:15px; border-radius:15px; border:1px solid #ddd; margin:20px 0;"><button style="width:100%; padding:15px; background:#1e293b; color:white; border:none; border-radius:15px; font-weight:bold;">UPDATE</button></form></body>')
 
 if __name__ == '__main__':
-    app.run()
+    # Render/Local উভয় জায়গাতেই কাজ করবে
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
