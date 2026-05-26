@@ -60,7 +60,7 @@ def get_settings():
             "admin_password": generate_password_hash("admin123"),
             "api_key": ''.join(random.choices(string.ascii_lowercase + string.digits, k=40)),
             "popunder": "", "banner": "", "social_bar": "", "native": "",
-            "multi_banner_code": "",
+            "multi_banner_code": "", # নতুন ১০০ ব্যানার কোডের জন্য
             "direct_click_limit": 1,
             "main_theme": "sky", "step_theme": "blue"
         }
@@ -97,6 +97,16 @@ def get_channels_html(theme_color="sky"):
         html += f'<a href="{ch["link"]}" target="_blank" class="flex flex-col items-center gap-3 group transition hover:scale-105"><div><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider">{ch.get("name", "Join Channel")}</p></div><img src="{ch["logo"]}" class="w-full max-w-[320px] h-[180px] object-cover border-2 border-white/10 rounded-lg shadow-2xl"></a>'
     return html + '</div></div>'
 
+# ১০০টি ব্যানার জেনারেট করার ফাংশন (চ্যানেলের নিচে দেখানোর জন্য)
+def get_100_banners_html():
+    settings = get_settings()
+    banner_code = settings.get('multi_banner_code', '').strip()
+    if not banner_code: return ""
+    html = '<div class="w-full max-w-5xl mx-auto flex flex-col items-center gap-4 mt-6">'
+    for i in range(100):
+        html += f'<div class="w-full flex justify-center overflow-hidden">{banner_code}</div>'
+    return html + '</div>'
+
 # --- API সিস্টেম (অন্য ডেভেলপারদের আপনার সার্ভিস ব্যবহারের জন্য) ---
 @app.route('/api')
 def api_system():
@@ -118,7 +128,7 @@ def api_system():
 def index():
     settings = get_settings()
     c = COLOR_MAP.get(settings.get('main_theme', 'sky'), COLOR_MAP['sky'])
-    return render_template_string(f'''<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{settings['site_name']}</title><style>body {{ background: #0f172a; color: white; }} .glass {{ background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }}</style></head><body class="min-h-screen flex flex-col items-center justify-center p-6 text-center"><h1 class="text-5xl md:text-9xl font-black mb-6 {c['text']} italic uppercase">{settings['site_name']}</h1><p class="text-gray-200 mb-14 text-xl md:text-4xl font-black uppercase tracking-widest">Premium Shortener System</p><div class="glass p-5 rounded-[50px] w-full max-w-4xl shadow-3xl"><form action="/shorten" method="POST" class="flex flex-col md:flex-row gap-4"><input type="url" name="long_url" placeholder="PASTE LINK HERE..." required class="flex-1 bg-transparent p-6 outline-none text-white text-2xl font-black"><button type="submit" class="{c['bg']} text-white px-14 py-6 rounded-[40px] font-black text-3xl hover:scale-105 transition uppercase">Shorten</button></form></div>{get_channels_html(settings.get('main_theme', 'sky'))}</body></html>''')
+    return render_template_string(f'''<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script><title>{settings['site_name']}</title><style>body {{ background: #0f172a; color: white; }} .glass {{ background: rgba(255,255,255,0.03); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }}</style></head><body class="min-h-screen flex flex-col items-center justify-center p-6 text-center"><h1 class="text-5xl md:text-9xl font-black mb-6 {c['text']} italic uppercase">{settings['site_name']}</h1><p class="text-gray-200 mb-14 text-xl md:text-4xl font-black uppercase tracking-widest">Premium Shortener System</p><div class="glass p-5 rounded-[50px] w-full max-w-4xl shadow-3xl"><form action="/shorten" method="POST" class="flex flex-col md:flex-row gap-4"><input type="url" name="long_url" placeholder="PASTE LINK HERE..." required class="flex-1 bg-transparent p-6 outline-none text-white text-2xl font-black"><button type="submit" class="{c['bg']} text-white px-14 py-6 rounded-[40px] font-black text-3xl hover:scale-105 transition uppercase">Shorten</button></form></div>{get_channels_html(settings.get('main_theme', 'sky'))}{get_100_banners_html()}</body></html>''')
 
 @app.route('/shorten', methods=['POST'])
 def web_shorten():
@@ -161,17 +171,23 @@ def admin_panel():
         <div class="w-full lg:w-72 bg-white border-b lg:border-r p-6 flex lg:flex-col overflow-x-auto lg:overflow-visible sticky top-0 z-50">
             <h2 class="hidden lg:block text-2xl font-black mb-10 text-blue-600 italic tracking-tighter">PREMIUM ADMIN</h2>
             <nav class="flex lg:flex-col gap-2 w-full">
+                <!-- ১. Dashboard: এখানে মোট ভিউ, আজকের ভিউ এবং চার্ট দেখা যায় -->
                 <button onclick="tab('dash')" id="btn-dash" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold active-btn">📊 Dashboard</button>
+                <!-- ২. Links: এখানে শর্ট করা লিংকের লিস্ট এবং ক্লিক সংখ্যা দেখা যায় -->
                 <button onclick="tab('links')" id="btn-links" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🔗 Links</button>
+                <!-- ৩. Ads: ডাইরেক্ট অ্যাড লিংক (যেমন Terra-Click) ম্যানেজ করার জায়গা -->
                 <button onclick="tab('ads')" id="btn-ads" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">💰 Ads</button>
+                <!-- ৪. Partners: পার্টনার চ্যানেলের নাম, লোগো এবং লিংক যুক্ত করার জায়গা -->
                 <button onclick="tab('partners')" id="btn-partners" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">📢 Partners</button>
+                <!-- ৫. Settings: সাইটের নাম, পাসওয়ার্ড, থিম, টাইম এবং অ্যাড কোড সেট করার জায়গা -->
                 <button onclick="tab('config')" id="btn-config" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">⚙️ Settings</button>
+                <!-- ৬. Logout: এখান থেকে এডমিন প্যানেল থেকে বের হওয়া যায় -->
                 <a href="/logout" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-4 lg:mt-10 border border-red-100 lg:border-none">🚪 Logout</a>
             </nav>
         </div>
 
         <div class="flex-1 p-6 lg:p-12 overflow-y-auto">
-            <!-- TAB: DASHBOARD -->
+            <!-- TAB: DASHBOARD (মূল পরিসংখ্যান) -->
             <div id="dash" class="tab-content active space-y-8">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-blue-600 p-8 rounded-[40px] text-white shadow-xl"><p class="text-xs font-bold opacity-70">TOTAL VIEWS</p><h3 class="text-5xl font-black">{{total_views}}</h3></div>
@@ -188,12 +204,13 @@ def admin_panel():
                         </div>
                     </div>
                 </div>
+                <!-- Direct Ad Link Performance: কোন অ্যাড লিংকে কতবার ক্লিক হয়েছে তার স্ট্যাটস -->
                 <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-4 uppercase text-slate-400 text-sm">Direct Ad Link Performance</h4>
                     <div class="space-y-2">{% for as in ad_stats %}<div class="flex justify-between p-4 bg-slate-50 rounded-2xl text-sm"><span class="truncate pr-4">{{as.url}}</span><b class="text-emerald-600">{{as.count}} Clicks</b></div>{% endfor %}</div>
                 </div>
             </div>
 
-            <!-- TAB: LINKS -->
+            <!-- TAB: LINKS (লিংক লিস্ট) -->
             <div id="links" class="tab-content">
                 <div class="bg-white rounded-[40px] border shadow-sm overflow-x-auto">
                     <table class="w-full text-left text-sm"><thead class="bg-slate-50 font-bold uppercase text-slate-400"><tr><th class="p-6">Link</th><th class="p-6">Original URL</th><th class="p-6">Clicks</th></tr></thead>
@@ -201,7 +218,7 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB: ADS -->
+            <!-- TAB: ADS (ডাইরেক্ট অ্যাড ম্যানেজমেন্ট) -->
             <div id="ads" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
                     <h4 class="font-black mb-6">Manage Direct Ad Links</h4>
@@ -213,7 +230,7 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB: PARTNERS -->
+            <!-- TAB: PARTNERS (পার্টনার চ্যানেল যোগ করা) -->
             <div id="partners" class="tab-content">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
                     <h4 class="font-black mb-6">Official Channels</h4>
@@ -227,18 +244,24 @@ def admin_panel():
                 </div>
             </div>
 
-            <!-- TAB: SETTINGS -->
+            <!-- TAB: SETTINGS (পুরো সাইটের কনফিগারেশন) -->
             <div id="config" class="tab-content space-y-8">
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-6">
                         <h4 class="font-black text-xl">General Settings</h4>
+                        <!-- সাইটের নাম পরিবর্তন -->
                         <input type="text" name="site_name" value="{{s.site_name}}" placeholder="Site Name" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <div class="grid grid-cols-2 gap-4">
+                            <!-- স্টেপ সংখ্যা (কতবার নেক্সট বাটনে ক্লিক করতে হবে) -->
                             <input type="number" name="steps" value="{{s.steps}}" placeholder="Steps" class="p-4 bg-slate-50 rounded-2xl">
+                            <!-- টাইমার সেকেন্ড (বাটন আসার আগে কতক্ষণ অপেক্ষা করতে হবে) -->
                             <input type="number" name="timer_seconds" value="{{s.timer_seconds}}" placeholder="Seconds" class="p-4 bg-slate-50 rounded-2xl">
+                            <!-- হোম পেজের কালার সেট করা -->
                             <select name="main_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.main_theme == k %}selected{% endif %}>HOME: {{k|upper}}</option>{% endfor %}</select>
+                            <!-- শর্ট লিংক পেজের কালার সেট করা -->
                             <select name="step_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.step_theme == k %}selected{% endif %}>STEP: {{k|upper}}</option>{% endfor %}</select>
                         </div>
+                        <!-- API Key সেকশন -->
                         <div class="bg-orange-50 p-6 rounded-3xl space-y-4">
                             <p class="text-xs font-bold text-orange-600 uppercase">API Management</p>
                             <input type="text" id="apiKey" name="api_key" value="{{s.api_key}}" class="w-full p-4 bg-white rounded-xl text-xs font-mono border outline-none">
@@ -247,20 +270,23 @@ def admin_panel():
                                 <button type="button" onclick="genApi()" class="flex-1 bg-orange-600 text-white py-3 rounded-lg text-xs font-bold">REGENERATE</button>
                             </div>
                         </div>
+                        <!-- টেলিগ্রাম আইডি এবং পাসওয়ার্ড রিসেট -->
                         <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram Chat ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full p-4 bg-red-50 rounded-2xl font-bold">
                     </div>
                     
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-4">
                         <h4 class="font-black text-xl text-emerald-600">Monetization Scripts</h4>
+                        <!-- Direct Click Limit: একবার কন্টিনিউ করতে কয়বার ডাইরেক্ট অ্যাড ওপেন হবে -->
                         <input type="number" name="direct_click_limit" value="{{s.direct_click_limit}}" class="w-full p-4 bg-blue-50 rounded-2xl font-bold" placeholder="Clicks per direct ad">
                         
-                        <!-- ১০০ ব্যানার এড এর জন্য স্পেশাল বক্স -->
+                        <!-- ১০০ ব্যানার এড বসানোর জন্য এডমিন বক্স -->
                         <div class="bg-blue-600/10 p-4 rounded-2xl border-2 border-blue-600">
-                             <p class="text-xs font-bold text-blue-700 mb-2 uppercase">Code for 100 Auto Banner Boxes</p>
-                             <textarea name="multi_banner_code" placeholder="Paste your banner script here... (This will show 100 times)" class="w-full h-32 p-4 bg-white rounded-xl text-xs font-mono border-blue-200 border">{{s.multi_banner_code}}</textarea>
+                             <p class="text-xs font-bold text-blue-700 mb-2 uppercase">100 Auto Banner Box Code</p>
+                             <textarea name="multi_banner_code" placeholder="Paste banner script here... (Displays 100 times below channels)" class="w-full h-32 p-4 bg-white rounded-xl text-xs font-mono border-blue-200 border">{{s.multi_banner_code}}</textarea>
                         </div>
 
+                        <!-- বিভিন্ন প্রকার অ্যাড স্ক্রিপ্ট (Adsterra/PopCash etc) বসানোর জায়গা -->
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.popunder}}</textarea>
                         <textarea name="banner" placeholder="Banner Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.banner}}</textarea>
                         <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
@@ -297,7 +323,7 @@ def admin_panel():
         devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, s=settings, 
         colors=COLOR_MAP.keys(), chart_labels=chart_labels, chart_values=chart_values)
 
-# --- এডমিন অ্যাকশনস ---
+# --- এডমিন অ্যাকশনস (ডাটা সেভ করার রুটসমূহ) ---
 @app.route('/admin/add_ad_link', methods=['POST'])
 def add_ad_link():
     if not is_logged_in(): return redirect(url_for('login'))
@@ -337,7 +363,7 @@ def update_settings():
         "banner": request.form.get('banner'),
         "social_bar": request.form.get('social_bar'),
         "native": request.form.get('native'),
-        "multi_banner_code": request.form.get('multi_banner_code'),
+        "multi_banner_code": request.form.get('multi_banner_code'), # ডাটাবেসে সেভ
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme')
@@ -347,7 +373,7 @@ def update_settings():
     settings_col.update_one({}, {"$set": d})
     return redirect(url_for('admin_panel'))
 
-# --- রিডাইরেক্ট লজিক ---
+# --- রিডাইরেক্ট লজিক (শর্ট লিংকে ক্লিক করলে কী হবে) ---
 @app.route('/<short_code>')
 def handle_ad_steps(short_code):
     step = int(request.args.get('step', 1))
@@ -355,37 +381,24 @@ def handle_ad_steps(short_code):
     url_data = urls_col.find_one({"short_code": short_code})
     if not url_data: return "404 Not Found", 404
     
+    # সব স্টেপ শেষ হলে মেইন লিংকে পাঠাবে
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
         track_click(short_code)
         return redirect(url_data['long_url'])
     
-    # ১০০টি ব্যানার বক্স তৈরি করার লজিক
-    multi_banners_html = ""
-    if settings.get('multi_banner_code'):
-        for i in range(100):
-            multi_banners_html += f'<div class="ad-slot w-full overflow-hidden flex justify-center my-4">{settings["multi_banner_code"]}</div>'
-
     ads = [l['url'] for l in ad_links_col.find()]
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
     return render_template_string('''
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script>
     {{ s.popunder|safe }} {{ s.social_bar|safe }}</head><body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
         <div class="mb-6">{{ s.banner|safe }}</div>
-        
-        <!-- ১০০টি ব্যানার অ্যাড এর প্রথম অংশ -->
-        <div class="w-full max-w-4xl">{{ multi_banners_top|safe }}</div>
-
         <div class="bg-white p-12 md:p-20 rounded-[50px] md:rounded-[70px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
             <p class="text-xl md:text-2xl font-black {{tc.text}} uppercase tracking-widest mb-4">Step {{step}} of {{total_steps}}</p>
             <div id="timer_box" class="text-7xl md:text-8xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 md:w-48 md:h-48 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
             <button id="main_btn" onclick="handleClick()" class="hidden w-full {{tc.bg}} text-white py-8 rounded-[40px] font-black text-3xl uppercase">Continue</button>
         </div>
-
-        <!-- ১০০টি ব্যানার অ্যাড এর দ্বিতীয় অংশ (নিচে) -->
-        <div class="w-full max-w-4xl mt-8">{{ multi_banners_bottom|safe }}</div>
-
-        <div class="mt-4">{{ s.native|safe }}</div>{{ partners_html|safe }}
+        <div class="mt-4">{{ s.native|safe }}</div>{{ partners_html|safe }}{{ multi_banners_html|safe }}
         <script>
             let sec = {{timer}}, ads = {{ads|tojson}}, clicks = 0, limit = {{limit}};
             const timerBox = document.getElementById('timer_box'), mainBtn = document.getElementById('main_btn');
@@ -399,20 +412,20 @@ def handle_ad_steps(short_code):
             }
         </script>
     </body></html>
-    ''', s=settings, step=step, total_steps=settings['steps'], timer=settings['timer_seconds'], tc=tc, ads=ads, limit=settings['direct_click_limit'], sc=short_code, partners_html=get_channels_html(settings.get('step_theme', 'blue')), multi_banners_top=multi_banners_html[:len(multi_banners_html)//2], multi_banners_bottom=multi_banners_html[len(multi_banners_html)//2:])
+    ''', s=settings, step=step, total_steps=settings['steps'], timer=settings['timer_seconds'], tc=tc, ads=ads, limit=settings['direct_click_limit'], sc=short_code, partners_html=get_channels_html(settings.get('step_theme', 'blue')), multi_banners_html=get_100_banners_html())
 
 @app.route('/track_ajax')
 def track_ajax():
     track_click(request.args.get('sc'), request.args.get('ad'))
     return "ok"
 
-# --- লগইন ও পাসওয়ার্ড রিকভারি ---
+# --- লগইন ও পাসওয়ার্ড রিকভারি (টেলিগ্রাম এর মাধ্যমে) ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if is_logged_in(): return redirect(url_for('admin_panel')) 
+    if is_logged_in(): return redirect(url_for('admin_panel')) # আগে থেকেই লগইন থাকলে প্যানেলে পাঠাবে
     if request.method == 'POST':
         if check_password_hash(get_settings()['admin_password'], request.form.get('password')):
-            session.permanent = True 
+            session.permanent = True # এই লাইনের মাধ্যমে লগইন ৩০ দিন সেভ থাকবে
             session['logged_in'] = True; return redirect(url_for('admin_panel'))
     return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;padding:20px;"><form method="POST" style="background:white;padding:40px;border-radius:30px;text-align:center;width:100%;max-width:350px;"><h2 style="font-weight:900;margin-bottom:30px;">ADMIN LOGIN</h2><input type="password" name="password" placeholder="Key" style="width:100%;padding:15px;margin-bottom:15px;border:1px solid #ddd;border-radius:10px;text-align:center;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:10px;font-weight:900;">LOGIN</button><a href="/forgot-password" style="display:block;margin-top:20px;font-size:12px;color:#3b82f6;text-decoration:none;">Forgot Passkey?</a></form></body>')
 
