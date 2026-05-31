@@ -85,7 +85,8 @@ def get_channels_html(theme_color="sky"):
     c = COLOR_MAP.get(theme_color, COLOR_MAP['sky'])
     html = f'<div class="w-full max-w-5xl mx-auto mt-12 mb-8 p-8 rounded-[40px] border-2 border-white/10 glass shadow-2xl text-center"><h3 class="{c["text"]} font-black mb-10 uppercase tracking-widest text-lg">Partner Channels</h3><div class="flex flex-col items-center gap-10">'
     for ch in channels:
-        html += f'<a href="{ch["link"]}" target="_blank" class="flex flex-col items-center gap-3 group transition hover:scale-105 w-full"><div class="w-full"><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider mb-2">{ch.get("name", "Join Channel")}</p><img src="{ch["logo"]}" class="w-full max-w-[500px] h-auto aspect-video object-cover border-2 border-white/10 rounded-2xl shadow-2xl mx-auto"></div></a>'
+        # এখানে img ট্যাগের ক্লাস পরিবর্তন করা হয়েছে যাতে লোগো ফুল সাইজ দেখায়
+        html += f'<a href="{ch["link"]}" target="_blank" class="flex flex-col items-center gap-3 group transition hover:scale-105 w-full"><div class="w-full"><p class="text-lg font-black text-gray-100 uppercase italic tracking-wider mb-2">{ch.get("name", "Join Channel")}</p><img src="{ch["logo"]}" class="w-full max-w-[500px] h-auto border-2 border-white/10 rounded-2xl shadow-2xl mx-auto block"></div></a>'
     return html + '</div></div>'
 
 # --- API সিস্টেম ---
@@ -128,7 +129,7 @@ def admin_panel():
     all_urls = list(urls_col.find().sort("_id", -1).limit(50))
     channels = list(channels_col.find())
     ad_links = list(ad_links_col.find())
-    banners = list(banners_col.find()) # নতুন ব্যানার লিস্ট
+    banners = list(banners_col.find()) 
     
     today = datetime.now().strftime("%Y-%m-%d")
     total_views = stats_col.count_documents({})
@@ -378,7 +379,7 @@ def handle_ad_steps(short_code):
     
     # মাঝখানের অ্যাড স্টেপগুলো
     ads = [l['url'] for l in ad_links_col.find()]
-    banners = list(banners_col.find()) # অ্যাডমিন থেকে সেভ করা সব অ্যাড
+    banners = list(banners_col.find()) 
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
     
     # রিয়েল স্পোর্টস নিউজ ডাইনামিক ডাটা
@@ -400,10 +401,8 @@ def handle_ad_steps(short_code):
             
             <div id="timer_box" class="text-7xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
             
-            <!-- টাইমার শেষ হলে এই বাটনটি আসবে যা স্ক্রল করে নিচে নিয়ে যাবে -->
             <button id="scroll_to_btn" onclick="document.getElementById('main_btn').scrollIntoView({behavior: 'smooth'})" style="display:none;" class="w-full {{tc.bg}} text-white py-6 rounded-3xl font-black text-xl uppercase mb-8 animate-bounce shadow-xl">Scroll to Continue ↓</button>
 
-            <!-- অ্যাড এবং নিউজ কার্ড (টাইমার থাকা অবস্থায়ই লোড হবে) -->
             <div id="ads_container" class="space-y-6">
                 {% for b in banners %}
                     <div class="ad-box">{{ b.code|safe }}</div>
