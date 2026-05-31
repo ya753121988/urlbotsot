@@ -27,6 +27,7 @@ channels_col = db['channels']
 otp_col = db['otps']
 ad_links_col = db['ad_links']
 stats_col = db['stats']
+banners_col = db['banners'] # নতুন কালেকশন
 
 # --- টেলিগ্রাম সেটিংস ---
 TELEGRAM_BOT_TOKEN = "8552256920:AAF6iyUJjJNsCUBVHm_XrxCxtlbnJtqnF2U"
@@ -127,6 +128,7 @@ def admin_panel():
     all_urls = list(urls_col.find().sort("_id", -1).limit(50))
     channels = list(channels_col.find())
     ad_links = list(ad_links_col.find())
+    banners = list(banners_col.find())
     
     today = datetime.now().strftime("%Y-%m-%d")
     total_views = stats_col.count_documents({})
@@ -151,6 +153,7 @@ def admin_panel():
                 <button onclick="tab('dash')" id="btn-dash" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold active-btn">📊 Dashboard</button>
                 <button onclick="tab('links')" id="btn-links" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🔗 Links</button>
                 <button onclick="tab('ads')" id="btn-ads" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">💰 Ads</button>
+                <button onclick="tab('banner_news')" id="btn-banner_news" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🖼️ Banners & News</button>
                 <button onclick="tab('partners')" id="btn-partners" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">📢 Partners</button>
                 <button onclick="tab('config')" id="btn-config" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">⚙️ Settings</button>
                 <a href="/logout" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-4 lg:mt-10 border border-red-100 lg:border-none">🚪 Logout</a>
@@ -174,9 +177,6 @@ def admin_panel():
                         </div>
                     </div>
                 </div>
-                <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-4 uppercase text-slate-400 text-sm">Direct Ad Link Performance</h4>
-                    <div class="space-y-2">{% for as in ad_stats %}<div class="flex justify-between p-4 bg-slate-50 rounded-2xl text-sm"><span class="truncate pr-4">{{as.url}}</span><b class="text-emerald-600">{{as.count}} Clicks</b></div>{% endfor %}</div>
-                </div>
             </div>
 
             <div id="links" class="tab-content">
@@ -194,6 +194,26 @@ def admin_panel():
                         <button class="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black">ADD LINK</button>
                     </form>
                     <div class="space-y-3">{% for l in ad_links %}<div class="bg-slate-50 p-5 rounded-3xl flex justify-between items-center"><span>{{l.url}}</span><a href="/admin/delete_ad_link/{{l._id}}" class="text-red-500 font-bold">DELETE</a></div>{% endfor %}</div>
+                </div>
+            </div>
+
+            <div id="banner_news" class="tab-content space-y-8">
+                <div class="bg-white p-10 rounded-[50px] border shadow-sm">
+                    <h4 class="font-black mb-6">Unlimited Banner Ads (Auto-Size)</h4>
+                    <form action="/admin/add_banner" method="POST" class="flex flex-col gap-4 mb-8">
+                        <input type="text" name="name" placeholder="Ad Spot Name (e.g. Header Ad)" required class="p-4 bg-slate-50 rounded-2xl">
+                        <textarea name="code" placeholder="Paste Ad HTML/JS Code here..." required class="h-32 p-4 bg-slate-50 rounded-2xl font-mono text-xs"></textarea>
+                        <button class="bg-purple-600 text-white px-10 py-4 rounded-2xl font-black">SAVE BANNER</button>
+                    </form>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {% for b in banners %}
+                        <div class="bg-slate-50 p-6 rounded-3xl border">
+                            <p class="font-bold mb-2">{{b.name}}</p>
+                            <code class="block bg-white p-3 rounded-lg text-[10px] truncate mb-4">{{b.code}}</code>
+                            <a href="/admin/delete_banner/{{b._id}}" class="text-red-500 font-bold text-sm">Remove Banner</a>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
 
@@ -221,25 +241,15 @@ def admin_panel():
                             <select name="main_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.main_theme == k %}selected{% endif %}>HOME: {{k|upper}}</option>{% endfor %}</select>
                             <select name="step_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.step_theme == k %}selected{% endif %}>STEP: {{k|upper}}</option>{% endfor %}</select>
                         </div>
-                        <div class="bg-orange-50 p-6 rounded-3xl space-y-4">
-                            <p class="text-xs font-bold text-orange-600 uppercase">API Management</p>
-                            <input type="text" id="apiKey" name="api_key" value="{{s.api_key}}" class="w-full p-4 bg-white rounded-xl text-xs font-mono border outline-none">
-                            <div class="flex gap-2">
-                                <button type="button" onclick="copyApi()" class="flex-1 bg-white text-orange-600 py-3 rounded-lg text-xs font-bold border">COPY KEY</button>
-                                <button type="button" onclick="genApi()" class="flex-1 bg-orange-600 text-white py-3 rounded-lg text-xs font-bold">REGENERATE</button>
-                            </div>
-                        </div>
                         <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram Chat ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full p-4 bg-red-50 rounded-2xl font-bold">
                     </div>
                     
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-4">
-                        <h4 class="font-black text-xl text-emerald-600">Monetization Scripts</h4>
+                        <h4 class="font-black text-xl text-emerald-600">Scripts</h4>
                         <input type="number" name="direct_click_limit" value="{{s.direct_click_limit}}" class="w-full p-4 bg-blue-50 rounded-2xl font-bold" placeholder="Clicks per direct ad">
                         <textarea name="popunder" placeholder="Popunder Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.popunder}}</textarea>
-                        <textarea name="banner" placeholder="Banner Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.banner}}</textarea>
                         <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
-                        <textarea name="native" placeholder="Native Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.native}}</textarea>
                         <button class="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-xl shadow-xl">SAVE ALL CHANGES</button>
                     </div>
                 </form>
@@ -252,15 +262,6 @@ def admin_panel():
                 document.getElementById(id).classList.add('active');
                 document.getElementById('btn-'+id).classList.add('active-btn');
             }
-            function genApi() {
-                const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-                let res = ""; for(let i=0; i<40; i++) res += chars[Math.floor(Math.random()*chars.length)];
-                document.getElementById('apiKey').value = res;
-            }
-            function copyApi() {
-                let key = document.getElementById('apiKey'); key.select();
-                navigator.clipboard.writeText(key.value); alert("API Key Copied!");
-            }
             new Chart(document.getElementById('trafficChart'), {
                 type: 'line',
                 data: { labels: {{chart_labels|tojson}}, datasets: [{ label: 'Views', data: {{chart_values|tojson}}, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4, borderWidth: 4 }] },
@@ -269,8 +270,22 @@ def admin_panel():
         </script>
     </body></html>
     ''', total_views=total_views, today_views=today_views, all_urls=all_urls, countries=countries, 
-        devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, s=settings, 
+        devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, banners=banners, s=settings, 
         colors=COLOR_MAP.keys(), chart_labels=chart_labels, chart_values=chart_values)
+
+# --- ব্যানার অ্যাড কন্ট্রোল ---
+@app.route('/admin/add_banner', methods=['POST'])
+def add_banner():
+    if not is_logged_in(): return redirect(url_for('login'))
+    name, code = request.form.get('name'), request.form.get('code')
+    if name and code: banners_col.insert_one({"name": name, "code": code})
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete_banner/<id>')
+def delete_banner(id):
+    if not is_logged_in(): return redirect(url_for('login'))
+    banners_col.delete_one({"_id": ObjectId(id)})
+    return redirect(url_for('admin_panel'))
 
 @app.route('/admin/add_ad_link', methods=['POST'])
 def add_ad_link():
@@ -306,11 +321,8 @@ def update_settings():
         "admin_telegram_id": request.form.get('admin_telegram_id'),
         "steps": int(request.form.get('steps', 2)),
         "timer_seconds": int(request.form.get('timer_seconds', 10)),
-        "api_key": request.form.get('api_key').strip(),
         "popunder": request.form.get('popunder'),
-        "banner": request.form.get('banner'),
         "social_bar": request.form.get('social_bar'),
-        "native": request.form.get('native'),
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
         "main_theme": request.form.get('main_theme'),
         "step_theme": request.form.get('step_theme')
@@ -328,7 +340,7 @@ def handle_ad_steps(short_code):
     url_data = urls_col.find_one({"short_code": short_code})
     if not url_data: return "404 Not Found", 404
     
-    # ফাইনাল Get Link পেজ (এখানে কোনো অ্যাড আসবে না)
+    # ফাইনাল Get Link পেজ
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
         track_click(short_code)
@@ -346,38 +358,84 @@ def handle_ad_steps(short_code):
     
     # মাঝখানের অ্যাড স্টেপগুলো
     ads = [l['url'] for l in ad_links_col.find()]
+    banners = list(banners_col.find()) # সব ব্যানার লোড করা হচ্ছে
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
+    
+    # স্পোর্টস নিউজ ডাটা (ডাইনামিক স্টাইল)
+    sports_news = [
+        {"country": "🇧🇩 BD", "title": "IPL 2025: Grand Auction Updates and Teams"},
+        {"country": "🇦🇺 AU", "title": "BBL: Hobart Hurricanes vs Perth Scorchers"},
+        {"country": "🇮🇳 IN", "title": "BCCI reveals New Schedule for Border-Gavaskar Trophy"},
+        {"country": "🇬🇧 UK", "title": "Premier League: Man City vs Arsenal Live Score"},
+        {"country": "🇦🇷 AR", "title": "Messi scores a screamer in latest MLS match"}
+    ]
+
     return render_template_string('''
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script>
-    {{ s.popunder|safe }} {{ s.social_bar|safe }}</head><body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
-        <div class="mb-6">{{ s.banner|safe }}</div>
-        <div class="bg-white p-12 md:p-20 rounded-[50px] md:rounded-[70px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
-            <p class="text-xl md:text-2xl font-black {{tc.text}} uppercase tracking-widest mb-4">Step {{step}} of {{total_steps}}</p>
-            <div id="timer_box" class="text-7xl md:text-8xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 md:w-48 md:h-48 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
-            <button id="main_btn" onclick="handleClick()" class="hidden w-full {{tc.bg}} text-white py-8 rounded-[40px] font-black text-3xl uppercase">Continue</button>
+    {{ s.popunder|safe }} {{ s.social_bar|safe }}
+    <style> .banner-box { width: 100%; overflow: auto; display: flex; justify-content: center; margin: 20px 0; } .banner-box iframe, .banner-box img { max-width: 100% !important; height: auto !important; } </style>
+    </head><body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
+        
+        <div class="bg-white p-10 md:p-16 rounded-[50px] md:rounded-[70px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
+            <p class="text-xl font-black {{tc.text}} uppercase tracking-widest mb-4">Step {{step}} of {{total_steps}}</p>
+            <div id="timer_box" class="text-7xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
+            
+            <div id="after_timer" class="hidden space-y-6">
+                <!-- আনলিমিটেড ব্যানার এবং স্পোর্টস নিউজ -->
+                {% for b in banners %}
+                    <div class="banner-box">{{ b.code|safe }}</div>
+                    
+                    <!-- স্পোর্টস নিউজ কার্ড -->
+                    <div class="bg-slate-100 p-4 rounded-2xl text-left border-l-4 {{tc.border}} flex items-center gap-4">
+                        <span class="font-black text-xs bg-white px-2 py-1 rounded">{{ sports_news|random|attr('country') }}</span>
+                        <marquee class="font-bold text-sm text-slate-700">{{ sports_news|random|attr('title') }}</marquee>
+                    </div>
+                {% endfor %}
+
+                <button id="main_btn" onclick="handleClick()" class="w-full {{tc.bg}} text-white py-8 rounded-[40px] font-black text-3xl uppercase mt-6 shadow-xl">Continue</button>
+            </div>
         </div>
-        <div class="mt-4">{{ s.native|safe }}</div>{{ partners_html|safe }}
+
+        {{ partners_html|safe }}
+
         <script>
             let sec = {{timer}}, ads = {{ads|tojson}}, clicks = 0, limit = {{limit}};
-            const timerBox = document.getElementById('timer_box'), mainBtn = document.getElementById('main_btn');
-            const iv = setInterval(() => { sec--; timerBox.innerText = sec; if(sec<=0) { clearInterval(iv); timerBox.style.display='none'; mainBtn.classList.remove('hidden'); updateBtn(); } }, 1000);
+            const timerBox = document.getElementById('timer_box'), afterTimer = document.getElementById('after_timer'), mainBtn = document.getElementById('main_btn');
+            
+            const iv = setInterval(() => { 
+                sec--; 
+                timerBox.innerText = sec; 
+                if(sec<=0) { 
+                    clearInterval(iv); 
+                    timerBox.style.display='none'; 
+                    afterTimer.classList.remove('hidden'); 
+                    updateBtn(); 
+                } 
+            }, 1000);
+
             function updateBtn() { mainBtn.innerText = (clicks < limit && ads.length > 0) ? "VERIFY ("+(clicks+1)+"/"+limit+")" : "CONTINUE"; }
+            
             function handleClick() {
                 if(clicks < limit && ads.length > 0) {
                     let r = ads[Math.floor(Math.random()*ads.length)];
-                    fetch('/track_ajax?sc={{sc}}&ad='+encodeURIComponent(r)); window.open(r, '_blank'); clicks++; updateBtn();
-                } else { window.location.href = "/{{sc}}?step="+({{step}}+1); }
+                    fetch('/track_ajax?sc={{sc}}&ad='+encodeURIComponent(r)); 
+                    window.open(r, '_blank'); 
+                    clicks++; 
+                    updateBtn();
+                } else { 
+                    window.location.href = "/{{sc}}?step="+({{step}}+1); 
+                }
             }
         </script>
     </body></html>
-    ''', s=settings, step=step, total_steps=settings['steps'], timer=settings['timer_seconds'], tc=tc, ads=ads, limit=settings['direct_click_limit'], sc=short_code, partners_html=get_channels_html(settings.get('step_theme', 'blue')))
+    ''', s=settings, step=step, total_steps=settings['steps'], timer=settings['timer_seconds'], tc=tc, ads=ads, banners=banners, sports_news=sports_news, limit=settings['direct_click_limit'], sc=short_code, partners_html=get_channels_html(settings.get('step_theme', 'blue')))
 
 @app.route('/track_ajax')
 def track_ajax():
     track_click(request.args.get('sc'), request.args.get('ad'))
     return "ok"
 
-# --- লগইন ও রিকভারি ---
+# --- লগইন ও রিকভারি কোড একই থাকবে ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if is_logged_in(): return redirect(url_for('admin_panel'))
