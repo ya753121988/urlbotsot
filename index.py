@@ -397,8 +397,12 @@ def handle_ad_steps(short_code):
         <div class="mb-6">{{ s.banner|safe }}</div>
         <div class="bg-white p-10 md:p-16 rounded-[50px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
             <p class="text-xl font-black {{tc.text}} uppercase tracking-widest mb-4">Step {{step}} of {{total_steps}}</p>
+            
             <div id="timer_box" class="text-7xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
             
+            <!-- টাইমার শেষ হলে এই বাটনটি আসবে যা স্ক্রল করে নিচে নিয়ে যাবে -->
+            <button id="scroll_to_btn" onclick="document.getElementById('main_btn').scrollIntoView({behavior: 'smooth'})" style="display:none;" class="w-full {{tc.bg}} text-white py-6 rounded-3xl font-black text-xl uppercase mb-8 animate-bounce shadow-xl">Scroll to Continue ↓</button>
+
             <!-- অ্যাড এবং নিউজ কার্ড (টাইমার থাকা অবস্থায়ই লোড হবে) -->
             <div id="ads_container" class="space-y-6">
                 {% for b in banners %}
@@ -417,11 +421,13 @@ def handle_ad_steps(short_code):
         
         <script>
             let sec = {{timer}}, ads = {{ads|tojson}}, clicks = 0, limit = {{limit}};
-            const timerBox = document.getElementById('timer_box'), mainBtn = document.getElementById('main_btn');
+            const timerBox = document.getElementById('timer_box'), mainBtn = document.getElementById('main_btn'), scrollBtn = document.getElementById('scroll_to_btn');
             const iv = setInterval(() => { 
                 sec--; timerBox.innerText = sec; 
                 if(sec<=0) { 
-                    clearInterval(iv); timerBox.style.display='none'; 
+                    clearInterval(iv); 
+                    timerBox.style.display='none'; 
+                    scrollBtn.style.display='block';
                     mainBtn.disabled = false; 
                     mainBtn.classList.remove('bg-slate-300', 'opacity-50', 'cursor-not-allowed');
                     mainBtn.classList.add('{{tc.bg}}');
