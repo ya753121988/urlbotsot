@@ -27,7 +27,7 @@ channels_col = db['channels']
 otp_col = db['otps']
 ad_links_col = db['ad_links']
 stats_col = db['stats']
-banners_col = db['banners'] # নতুন কালেকশন
+banners_col = db['banners']
 
 # --- টেলিগ্রাম সেটিংস ---
 TELEGRAM_BOT_TOKEN = "8552256920:AAF6iyUJjJNsCUBVHm_XrxCxtlbnJtqnF2U"
@@ -142,21 +142,20 @@ def admin_panel():
     ad_stats = [{"url": al['url'], "count": stats_col.count_documents({"ad_link": al['url']})} for al in ad_links]
 
     return render_template_string('''
-    <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Premium Admin</title>
+    <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Admin Panel</title>
     <script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style> .tab-content { display: none; } .tab-content.active { display: block; } .active-btn { background: #1e293b !important; color: white !important; } 
-    ::-webkit-scrollbar { height: 5px; } ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; } </style>
+    <style> .tab-content { display: none; } .tab-content.active { display: block; } .active-btn { background: #1e293b !important; color: white !important; } </style>
     </head><body class="bg-slate-50 flex flex-col lg:flex-row min-h-screen font-sans">
         <div class="w-full lg:w-72 bg-white border-b lg:border-r p-6 flex lg:flex-col overflow-x-auto lg:overflow-visible sticky top-0 z-50">
-            <h2 class="hidden lg:block text-2xl font-black mb-10 text-blue-600 italic tracking-tighter">PREMIUM ADMIN</h2>
+            <h2 class="hidden lg:block text-2xl font-black mb-10 text-blue-600 italic">ADMIN</h2>
             <nav class="flex lg:flex-col gap-2 w-full">
                 <button onclick="tab('dash')" id="btn-dash" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold active-btn">📊 Dashboard</button>
                 <button onclick="tab('links')" id="btn-links" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🔗 Links</button>
-                <button onclick="tab('ads')" id="btn-ads" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">💰 Ads</button>
-                <button onclick="tab('banner_news')" id="btn-banner_news" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🖼️ Banners & News</button>
+                <button onclick="tab('ads')" id="btn-ads" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">💰 Direct Ads</button>
+                <button onclick="tab('banner')" id="btn-banner" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">🖼️ Banners</button>
                 <button onclick="tab('partners')" id="btn-partners" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">📢 Partners</button>
                 <button onclick="tab('config')" id="btn-config" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-slate-500">⚙️ Settings</button>
-                <a href="/logout" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-4 lg:mt-10 border border-red-100 lg:border-none">🚪 Logout</a>
+                <a href="/logout" class="flex-1 lg:w-full text-center lg:text-left p-4 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-4 border lg:border-none">🚪 Logout</a>
             </nav>
         </div>
 
@@ -167,50 +166,39 @@ def admin_panel():
                     <div class="bg-emerald-500 p-8 rounded-[40px] text-white shadow-xl"><p class="text-xs font-bold opacity-70">TODAY'S VIEWS</p><h3 class="text-5xl font-black">{{today_views}}</h3></div>
                     <div class="bg-white p-8 rounded-[40px] border shadow-sm"><p class="text-xs font-bold text-slate-400">TOTAL LINKS</p><h3 class="text-5xl font-black text-slate-800">{{all_urls|length}}</h3></div>
                 </div>
-                <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                    <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-6 uppercase text-slate-400 text-sm">Traffic Trend</h4><canvas id="trafficChart"></canvas></div>
-                    <div class="bg-white p-8 rounded-[40px] border shadow-sm">
-                        <h4 class="font-black mb-6 uppercase text-slate-400 text-sm">Devices & Countries</h4>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div><p class="text-xs font-bold text-blue-600 mb-2">DEVICES</p>{% for d in devices %}<div class="bg-slate-50 p-2 rounded-lg text-xs mb-1 flex justify-between"><span>{{d._id}}</span><b>{{d.count}}</b></div>{% endfor %}</div>
-                            <div><p class="text-xs font-bold text-orange-600 mb-2">COUNTRIES</p>{% for c in countries %}<div class="bg-slate-50 p-2 rounded-lg text-xs mb-1 flex justify-between"><span>{{c._id}}</span><b>{{c.count}}</b></div>{% endfor %}</div>
-                        </div>
-                    </div>
-                </div>
+                <div class="bg-white p-8 rounded-[40px] border shadow-sm"><h4 class="font-black mb-6 uppercase text-slate-400 text-sm">Traffic Trend</h4><canvas id="trafficChart"></canvas></div>
             </div>
 
             <div id="links" class="tab-content">
-                <div class="bg-white rounded-[40px] border shadow-sm overflow-x-auto">
-                    <table class="w-full text-left text-sm"><thead class="bg-slate-50 font-bold uppercase text-slate-400"><tr><th class="p-6">Link</th><th class="p-6">Original URL</th><th class="p-6">Clicks</th></tr></thead>
-                    <tbody class="divide-y font-bold">{% for u in all_urls %}<tr><td class="p-6 text-blue-600">/{{u.short_code}}</td><td class="p-6 truncate max-w-xs text-slate-500">{{u.long_url}}</td><td class="p-6">{{u.clicks}}</td></tr>{% endfor %}</tbody></table>
+                <div class="bg-white rounded-[40px] border shadow-sm overflow-hidden">
+                    <table class="w-full text-left text-sm"><thead class="bg-slate-50 font-bold uppercase text-slate-400"><tr><th class="p-6">Link</th><th class="p-6">Clicks</th></tr></thead>
+                    <tbody class="divide-y font-bold">{% for u in all_urls %}<tr><td class="p-6 text-blue-600">/{{u.short_code}}</td><td class="p-6">{{u.clicks}}</td></tr>{% endfor %}</tbody></table>
                 </div>
             </div>
 
             <div id="ads" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
-                    <h4 class="font-black mb-6">Manage Direct Ad Links</h4>
+                    <h4 class="font-black mb-6">Manage Direct Ad Links (Steps Click)</h4>
                     <form action="/admin/add_ad_link" method="POST" class="flex flex-col md:flex-row gap-4 mb-8">
                         <input type="url" name="ad_url" placeholder="Paste Direct Link URL..." required class="flex-1 p-4 bg-slate-50 rounded-2xl">
                         <button class="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black">ADD LINK</button>
                     </form>
-                    <div class="space-y-3">{% for l in ad_links %}<div class="bg-slate-50 p-5 rounded-3xl flex justify-between items-center"><span>{{l.url}}</span><a href="/admin/delete_ad_link/{{l._id}}" class="text-red-500 font-bold">DELETE</a></div>{% endfor %}</div>
+                    <div class="space-y-3">{% for l in ad_links %}<div class="bg-slate-50 p-5 rounded-3xl flex justify-between items-center"><span class="truncate">{{l.url}}</span><a href="/admin/delete_ad_link/{{l._id}}" class="text-red-500 font-bold">DELETE</a></div>{% endfor %}</div>
                 </div>
             </div>
 
-            <div id="banner_news" class="tab-content space-y-8">
+            <div id="banner" class="tab-content space-y-8">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
-                    <h4 class="font-black mb-6">Unlimited Banner Ads (Auto-Size)</h4>
+                    <h4 class="font-black mb-6">Manage Banner Ad Codes</h4>
                     <form action="/admin/add_banner" method="POST" class="flex flex-col gap-4 mb-8">
-                        <input type="text" name="name" placeholder="Ad Spot Name (e.g. Header Ad)" required class="p-4 bg-slate-50 rounded-2xl">
-                        <textarea name="code" placeholder="Paste Ad HTML/JS Code here..." required class="h-32 p-4 bg-slate-50 rounded-2xl font-mono text-xs"></textarea>
-                        <button class="bg-purple-600 text-white px-10 py-4 rounded-2xl font-black">SAVE BANNER</button>
+                        <textarea name="code" placeholder="Paste Banner/Company Ad HTML/JS Code here..." required class="h-40 p-4 bg-slate-50 rounded-2xl font-mono text-sm"></textarea>
+                        <button class="bg-purple-600 text-white px-10 py-4 rounded-2xl font-black">SAVE AD CODE</button>
                     </form>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {% for b in banners %}
-                        <div class="bg-slate-50 p-6 rounded-3xl border">
-                            <p class="font-bold mb-2">{{b.name}}</p>
-                            <code class="block bg-white p-3 rounded-lg text-[10px] truncate mb-4">{{b.code}}</code>
-                            <a href="/admin/delete_banner/{{b._id}}" class="text-red-500 font-bold text-sm">Remove Banner</a>
+                        <div class="bg-slate-50 p-6 rounded-3xl border flex flex-col justify-between">
+                            <div class="bg-white p-4 rounded-xl text-[10px] font-mono overflow-auto h-24 mb-4"><code>{{b.code}}</code></div>
+                            <a href="/admin/delete_banner/{{b._id}}" class="text-red-500 font-bold text-sm">Remove Ad</a>
                         </div>
                         {% endfor %}
                     </div>
@@ -220,7 +208,7 @@ def admin_panel():
             <div id="partners" class="tab-content">
                 <div class="bg-white p-10 rounded-[50px] border shadow-sm">
                     <h4 class="font-black mb-6">Official Channels</h4>
-                    <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
+                    <form action="/admin/add_channel" method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
                         <input type="text" name="name" placeholder="Name" required class="p-4 bg-slate-50 rounded-xl">
                         <input type="url" name="logo" placeholder="Logo URL" required class="p-4 bg-slate-50 rounded-xl">
                         <input type="url" name="link" placeholder="Invite Link" required class="p-4 bg-slate-50 rounded-xl">
@@ -234,22 +222,19 @@ def admin_panel():
                 <form action="/admin/update" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-6">
                         <h4 class="font-black text-xl">General Settings</h4>
-                        <input type="text" name="site_name" value="{{s.site_name}}" placeholder="Site Name" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
+                        <input type="text" name="site_name" value="{{s.site_name}}" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <div class="grid grid-cols-2 gap-4">
-                            <input type="number" name="steps" value="{{s.steps}}" placeholder="Steps" class="p-4 bg-slate-50 rounded-2xl">
-                            <input type="number" name="timer_seconds" value="{{s.timer_seconds}}" placeholder="Seconds" class="p-4 bg-slate-50 rounded-2xl">
-                            <select name="main_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.main_theme == k %}selected{% endif %}>HOME: {{k|upper}}</option>{% endfor %}</select>
-                            <select name="step_theme" class="p-4 bg-slate-50 rounded-2xl">{% for k in colors %}<option value="{{k}}" {% if s.step_theme == k %}selected{% endif %}>STEP: {{k|upper}}</option>{% endfor %}</select>
+                            <input type="number" name="steps" value="{{s.steps}}" class="p-4 bg-slate-50 rounded-2xl">
+                            <input type="number" name="timer_seconds" value="{{s.timer_seconds}}" class="p-4 bg-slate-50 rounded-2xl">
                         </div>
                         <input type="text" name="admin_telegram_id" value="{{s.admin_telegram_id}}" placeholder="Telegram Chat ID" class="w-full p-4 bg-slate-50 rounded-2xl font-bold">
                         <input type="password" name="new_password" placeholder="Change Admin Password" class="w-full p-4 bg-red-50 rounded-2xl font-bold">
                     </div>
-                    
                     <div class="bg-white p-10 rounded-[50px] shadow-sm border space-y-4">
-                        <h4 class="font-black text-xl text-emerald-600">Scripts</h4>
+                        <h4 class="font-black text-xl">Monetization Scripts</h4>
                         <input type="number" name="direct_click_limit" value="{{s.direct_click_limit}}" class="w-full p-4 bg-blue-50 rounded-2xl font-bold" placeholder="Clicks per direct ad">
-                        <textarea name="popunder" placeholder="Popunder Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.popunder}}</textarea>
-                        <textarea name="social_bar" placeholder="Social Bar Script" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
+                        <textarea name="popunder" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.popunder}}</textarea>
+                        <textarea name="social_bar" class="w-full h-24 p-4 bg-slate-50 rounded-xl text-xs font-mono">{{s.social_bar}}</textarea>
                         <button class="w-full bg-slate-900 text-white py-6 rounded-3xl font-black text-xl shadow-xl">SAVE ALL CHANGES</button>
                     </div>
                 </form>
@@ -264,21 +249,19 @@ def admin_panel():
             }
             new Chart(document.getElementById('trafficChart'), {
                 type: 'line',
-                data: { labels: {{chart_labels|tojson}}, datasets: [{ label: 'Views', data: {{chart_values|tojson}}, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4, borderWidth: 4 }] },
-                options: { responsive: true, plugins: { legend: { display: false } } }
+                data: { labels: {{chart_labels|tojson}}, datasets: [{ label: 'Views', data: {{chart_values|tojson}}, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.4, borderWidth: 4 }] }
             });
         </script>
     </body></html>
     ''', total_views=total_views, today_views=today_views, all_urls=all_urls, countries=countries, 
         devices=devices, ad_stats=ad_stats, ad_links=ad_links, channels=channels, banners=banners, s=settings, 
-        colors=COLOR_MAP.keys(), chart_labels=chart_labels, chart_values=chart_values)
+        chart_labels=chart_labels, chart_values=chart_values)
 
-# --- ব্যানার অ্যাড কন্ট্রোল ---
 @app.route('/admin/add_banner', methods=['POST'])
 def add_banner():
     if not is_logged_in(): return redirect(url_for('login'))
-    name, code = request.form.get('name'), request.form.get('code')
-    if name and code: banners_col.insert_one({"name": name, "code": code})
+    code = request.form.get('code')
+    if code: banners_col.insert_one({"code": code})
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/delete_banner/<id>')
@@ -304,7 +287,7 @@ def delete_ad_link(id):
 def add_channel():
     if not is_logged_in(): return redirect(url_for('login'))
     name, logo, link = request.form.get('name'), request.form.get('logo'), request.form.get('link')
-    if logo and link: channels_col.insert_one({"name": name, "logo": logo, "link": link})
+    if name and logo and link: channels_col.insert_one({"name": name, "logo": logo, "link": link})
     return redirect(url_for('admin_panel'))
 
 @app.route('/admin/delete_channel/<id>')
@@ -324,8 +307,6 @@ def update_settings():
         "popunder": request.form.get('popunder'),
         "social_bar": request.form.get('social_bar'),
         "direct_click_limit": int(request.form.get('direct_click_limit', 1)),
-        "main_theme": request.form.get('main_theme'),
-        "step_theme": request.form.get('step_theme')
     }
     np = request.form.get('new_password')
     if np and len(np) > 2: d["admin_password"] = generate_password_hash(np)
@@ -340,7 +321,6 @@ def handle_ad_steps(short_code):
     url_data = urls_col.find_one({"short_code": short_code})
     if not url_data: return "404 Not Found", 404
     
-    # ফাইনাল Get Link পেজ
     if step > settings['steps']:
         urls_col.update_one({"short_code": short_code}, {"$inc": {"clicks": 1}})
         track_click(short_code)
@@ -349,58 +329,57 @@ def handle_ad_steps(short_code):
         <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script></head>
         <body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen text-center">
             <div class="bg-white p-12 rounded-[50px] shadow-2xl max-w-2xl w-full border-t-[16px] {tc['border']} mt-10">
-                <h2 class="text-4xl font-black {tc['text']} uppercase italic mb-6">Your Link is Ready!</h2>
+                <h2 class="text-4xl font-black {tc['text']} uppercase mb-6 italic">Ready!</h2>
                 <a href="{url_data['long_url']}" class="block w-full {tc['bg']} text-white py-8 rounded-[40px] font-black text-4xl uppercase shadow-xl hover:scale-105 transition">GET LINK</a>
             </div>
             {get_channels_html(settings.get('step_theme', 'blue'))}
         </body></html>
         ''')
     
-    # মাঝখানের অ্যাড স্টেপগুলো
     ads = [l['url'] for l in ad_links_col.find()]
-    banners = list(banners_col.find()) # সব ব্যানার লোড করা হচ্ছে
+    banners = list(banners_col.find())
     tc = COLOR_MAP.get(settings.get('step_theme', 'blue'), COLOR_MAP['blue'])
     
-    # স্পোর্টস নিউজ ডাটা (ডাইনামিক স্টাইল)
     sports_news = [
-        {"country": "🇧🇩 BD", "title": "IPL 2025: Grand Auction Updates and Teams"},
-        {"country": "🇦🇺 AU", "title": "BBL: Hobart Hurricanes vs Perth Scorchers"},
-        {"country": "🇮🇳 IN", "title": "BCCI reveals New Schedule for Border-Gavaskar Trophy"},
-        {"country": "🇬🇧 UK", "title": "Premier League: Man City vs Arsenal Live Score"},
-        {"country": "🇦🇷 AR", "title": "Messi scores a screamer in latest MLS match"}
+        {"img": "https://img.freepik.com/free-photo/soccer-ball-stadium-night_23-2148821558.jpg", "tag": "FOOTBALL", "title": "Champions League Final: Teams are ready for the ultimate battle!"},
+        {"img": "https://img.freepik.com/free-photo/cricket-ball-pitch_23-2148135245.jpg", "tag": "CRICKET", "title": "IPL Auction 2025: Shocking price tags for international players."},
+        {"img": "https://img.freepik.com/free-vector/modern-tennis-background-with-ball-racket_23-2148122359.jpg", "tag": "TENNIS", "title": "Wimbledon 2025: Grand Slam excitement begins today."},
+        {"img": "https://img.freepik.com/free-photo/close-up-basketball-player_23-2148858342.jpg", "tag": "NBA", "title": "LeBron James sets a new record in tonight's intense match."}
     ]
 
     return render_template_string('''
     <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0"><script src="https://cdn.tailwindcss.com"></script>
     {{ s.popunder|safe }} {{ s.social_bar|safe }}
-    <style> .banner-box { width: 100%; overflow: auto; display: flex; justify-content: center; margin: 20px 0; } .banner-box iframe, .banner-box img { max-width: 100% !important; height: auto !important; } </style>
+    <style> .ad-box { width: 100%; display: flex; justify-content: center; margin: 25px 0; overflow: hidden; border-radius: 20px; } .ad-box * { max-width: 100% !important; } </style>
     </head><body class="bg-slate-50 flex flex-col items-center p-6 min-h-screen">
         
-        <div class="bg-white p-10 md:p-16 rounded-[50px] md:rounded-[70px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
+        <div class="bg-white p-10 md:p-16 rounded-[50px] shadow-2xl text-center max-w-2xl w-full border-t-[16px] {{tc.border}}">
             <p class="text-xl font-black {{tc.text}} uppercase tracking-widest mb-4">Step {{step}} of {{total_steps}}</p>
             <div id="timer_box" class="text-7xl font-black {{tc.text}} mb-8 {{tc.light_bg}} w-40 h-40 flex items-center justify-center rounded-full mx-auto border-8 shadow-inner">{{timer}}</div>
             
-            <div id="after_timer" class="hidden space-y-6">
-                <!-- আনলিমিটেড ব্যানার এবং স্পোর্টস নিউজ -->
+            <!-- অ্যাডগুলো সবসময় লোড থাকবে -->
+            <div class="space-y-6">
                 {% for b in banners %}
-                    <div class="banner-box">{{ b.code|safe }}</div>
-                    
-                    <!-- স্পোর্টস নিউজ কার্ড -->
-                    <div class="bg-slate-100 p-4 rounded-2xl text-left border-l-4 {{tc.border}} flex items-center gap-4">
-                        <span class="font-black text-xs bg-white px-2 py-1 rounded">{{ sports_news|random|attr('country') }}</span>
-                        <marquee class="font-bold text-sm text-slate-700">{{ sports_news|random|attr('title') }}</marquee>
+                    <div class="ad-box">{{ b.code|safe }}</div>
+                    {% set news = sports_news|random %}
+                    <div class="bg-slate-50 rounded-3xl overflow-hidden border border-slate-100 text-left shadow-sm mb-6">
+                        <img src="{{ news.img }}" class="w-full h-40 object-cover">
+                        <div class="p-5">
+                            <span class="bg-blue-600 text-white text-[10px] px-3 py-1 rounded-full font-black">{{ news.tag }}</span>
+                            <h3 class="mt-2 font-bold text-slate-800 text-lg leading-tight">{{ news.title }}</h3>
+                        </div>
                     </div>
                 {% endfor %}
-
-                <button id="main_btn" onclick="handleClick()" class="w-full {{tc.bg}} text-white py-8 rounded-[40px] font-black text-3xl uppercase mt-6 shadow-xl">Continue</button>
             </div>
+
+            <button id="main_btn" disabled onclick="handleClick()" class="w-full bg-slate-300 text-white py-8 rounded-[40px] font-black text-3xl uppercase mt-6 opacity-50 cursor-not-allowed">Wait...</button>
         </div>
 
         {{ partners_html|safe }}
 
         <script>
             let sec = {{timer}}, ads = {{ads|tojson}}, clicks = 0, limit = {{limit}};
-            const timerBox = document.getElementById('timer_box'), afterTimer = document.getElementById('after_timer'), mainBtn = document.getElementById('main_btn');
+            const timerBox = document.getElementById('timer_box'), mainBtn = document.getElementById('main_btn');
             
             const iv = setInterval(() => { 
                 sec--; 
@@ -408,7 +387,9 @@ def handle_ad_steps(short_code):
                 if(sec<=0) { 
                     clearInterval(iv); 
                     timerBox.style.display='none'; 
-                    afterTimer.classList.remove('hidden'); 
+                    mainBtn.disabled = false;
+                    mainBtn.classList.remove('bg-slate-300', 'opacity-50', 'cursor-not-allowed');
+                    mainBtn.classList.add('{{tc.bg}}');
                     updateBtn(); 
                 } 
             }, 1000);
@@ -435,7 +416,7 @@ def track_ajax():
     track_click(request.args.get('sc'), request.args.get('ad'))
     return "ok"
 
-# --- লগইন ও রিকভারি কোড একই থাকবে ---
+# --- লগইন ও রিকভারি ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if is_logged_in(): return redirect(url_for('admin_panel'))
@@ -443,40 +424,10 @@ def login():
         if check_password_hash(get_settings()['admin_password'], request.form.get('password')):
             session.permanent = True
             session['logged_in'] = True; return redirect(url_for('admin_panel'))
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;padding:20px;"><form method="POST" style="background:white;padding:40px;border-radius:30px;text-align:center;width:100%;max-width:350px;"><h2 style="font-weight:900;margin-bottom:30px;">ADMIN LOGIN</h2><input type="password" name="password" placeholder="Key" style="width:100%;padding:15px;margin-bottom:15px;border:1px solid #ddd;border-radius:10px;text-align:center;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:10px;font-weight:900;">LOGIN</button><a href="/forgot-password" style="display:block;margin-top:20px;font-size:12px;color:#3b82f6;text-decoration:none;">Forgot Passkey?</a></form></body>')
+    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2 style="font-weight:900;">ADMIN LOGIN</h2><input type="password" name="password" placeholder="Passkey" required style="width:100%;padding:15px;margin:20px 0;border-radius:10px;border:1px solid #ddd;text-align:center;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:10px;font-weight:900;">LOGIN</button></form></body>')
 
 @app.route('/logout')
 def logout(): session.clear(); return redirect(url_for('login'))
-
-@app.route('/forgot-password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        tg_id = request.form.get('telegram_id')
-        settings = get_settings()
-        if tg_id == settings.get('admin_telegram_id'):
-            otp = str(random.randint(100000, 999999))
-            otp_col.update_one({"id": "admin_reset"}, {"$set": {"otp": otp, "expire_at": datetime.now() + timedelta(minutes=5)}}, upsert=True)
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", data={"chat_id": tg_id, "text": f"🛡️ OTP: {otp}"})
-            session['reset_id'] = tg_id; return redirect(url_for('verify_otp'))
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2>Recovery</h2><input type="text" name="telegram_id" placeholder="Telegram Chat ID" required style="width:100%;padding:15px;margin:20px 0;text-align:center;"><button style="width:100%;padding:15px;background:#3b82f6;color:white;border:none;border-radius:15px;">GET OTP</button></form></body>')
-
-@app.route('/verify-otp', methods=['GET', 'POST'])
-def verify_otp():
-    if not session.get('reset_id'): return redirect('/forgot-password')
-    if request.method == 'POST':
-        otp = request.form.get('otp'); data = otp_col.find_one({"id": "admin_reset"})
-        if data and data['otp'] == otp and data['expire_at'] > datetime.now():
-            session['otp_verified'] = True; return redirect(url_for('reset_password'))
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;text-align:center;"><h2>Verify OTP</h2><input type="text" name="otp" placeholder="ENTER OTP" required style="width:100%;padding:15px;margin:20px 0;text-align:center;font-size:24px;"><button style="width:100%;padding:15px;background:#10b981;color:white;border:none;border-radius:15px;">VERIFY</button></form></body>')
-
-@app.route('/reset-password', methods=['GET', 'POST'])
-def reset_password():
-    if not session.get('otp_verified'): return redirect('/forgot-password')
-    if request.method == 'POST':
-        pw = request.form.get('password')
-        settings_col.update_one({}, {"$set": {"admin_password": generate_password_hash(pw)}})
-        session.clear(); return 'SUCCESS! <a href="/login">LOGIN NOW</a>'
-    return render_template_string('<body style="background:#0f172a;display:flex;justify-content:center;align-items:center;height:100vh;"><form method="POST" style="background:white;padding:40px;border-radius:30px;width:320px;"><h2 style="text-align:center;">NEW PASSWORD</h2><input type="password" name="password" required placeholder="New Password" style="width:100%;padding:15px;margin:20px 0;"><button style="width:100%;padding:15px;background:#1e293b;color:white;border:none;border-radius:15px;">UPDATE</button></form></body>')
 
 if __name__ == '__main__':
     app.run(debug=True)
